@@ -185,6 +185,18 @@ tr.hl td{background:var(--amber-bg)}
 .settings.one{grid-template-columns:minmax(200px,320px)}
 .pill{display:inline-block;padding:1px 7px;border-radius:99px;background:var(--sunken);font-size:12px;color:var(--muted)}
 mark{background:var(--amber-bg);color:var(--ink);padding:0 3px;border-radius:3px;font-weight:600}
+.menu{position:relative;display:inline-block}
+.menu>summary{list-style:none;cursor:pointer;user-select:none}
+.menu>summary::-webkit-details-marker{display:none}
+.menu>summary::after{content:"";width:6px;height:6px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg) translateY(-2px);margin-left:4px}
+.menu[open]>summary::after{transform:rotate(-135deg) translateY(-1px)}
+.menu-list{position:absolute;right:0;top:calc(100% + 6px);z-index:30;width:min(320px,86vw);background:var(--surface);border:1px solid var(--line-strong);border-radius:6px;padding:6px;box-shadow:0 8px 24px rgba(10,16,30,.25)}
+.menu-note{margin:2px 8px 6px;font-size:12px;color:var(--muted)}
+.menu-list button{display:block;width:100%;text-align:left;padding:8px 10px;border:0;background:none;border-radius:4px;cursor:pointer}
+.menu-list button:hover,.menu-list button:focus-visible{background:var(--sunken)}
+.menu-list button b{display:block;font-size:14px;font-weight:600}
+.menu-list button span{display:block;font-size:12px;color:var(--muted);line-height:1.35;margin-top:1px}
+mark{background:var(--amber-bg);color:var(--ink);padding:0 3px;border-radius:3px;font-weight:600}
 </style>
 </head>
 <body>
@@ -260,6 +272,15 @@ mark{background:var(--amber-bg);color:var(--ink);padding:0 3px;border-radius:3px
         <span class="spacer"></span>
         <span class="count" id="aCount"></span>
         <button type="button" class="btn small" id="aCopy">Salin hasil</button>
+        <details class="menu" id="aMenu">
+          <summary class="btn small primary" aria-label="Ekspor hasil">Ekspor</summary>
+          <div class="menu-list" role="menu">
+            <p class="menu-note">Sesuai filter dan urutan saat ini</p>
+            <button type="button" role="menuitem" data-scope="anom" data-kind="xlsx"><b>Excel (.xlsx)</b><span>Disarankan: Tracking ID tetap utuh. Ditambah sheet ringkasan kelompok bermasalah</span></button>
+            <button type="button" role="menuitem" data-scope="anom" data-kind="csv;"><b>CSV, pemisah titik koma</b><span>Untuk Excel versi Indonesia</span></button>
+            <button type="button" role="menuitem" data-scope="anom" data-kind="csv,"><b>CSV, pemisah koma</b><span>Untuk Google Sheets dan aplikasi lain</span></button>
+          </div>
+        </details>
       </div>
       <div class="scroll"><table id="aTable">
         <thead><tr>
@@ -282,6 +303,15 @@ mark{background:var(--amber-bg);color:var(--ink);padding:0 3px;border-radius:3px
         <label class="chk"><input type="checkbox" id="pOnly" checked> Hanya yang bermasalah</label>
         <span class="spacer"></span>
         <span class="count" id="pCount"></span>
+        <details class="menu" id="pMenu">
+          <summary class="btn small primary" aria-label="Ekspor hasil">Ekspor</summary>
+          <div class="menu-list" role="menu">
+            <p class="menu-note">Sesuai filter dan urutan saat ini</p>
+            <button type="button" role="menuitem" data-scope="prod" data-kind="xlsx"><b>Excel (.xlsx)</b><span>Disarankan: satu sheet berisi kelompok sesuai filter</span></button>
+            <button type="button" role="menuitem" data-scope="prod" data-kind="csv;"><b>CSV, pemisah titik koma</b><span>Untuk Excel versi Indonesia</span></button>
+            <button type="button" role="menuitem" data-scope="prod" data-kind="csv,"><b>CSV, pemisah koma</b><span>Untuk Google Sheets dan aplikasi lain</span></button>
+          </div>
+        </details>
       </div>
       <div class="scroll"><table id="pTable">
         <thead><tr>
@@ -717,6 +747,80 @@ function copyAnom(){
   copyText(text).then(function(ok){ if (ok) toast(fmt(rows.length) + ' baris disalin. Tempel ke Excel atau Google Sheets.'); else manualCopy(text); });
 }
 
+
+/* ---------- ekspor CSV / Excel ---------- */
+function today(){ return new Date().toISOString().slice(0, 10); }
+function csvCell(v, d){
+  if (v === null || v === undefined || v === '') return '';
+  var s = typeof v === 'number' ? (d === ';' ? String(v).replace('.', ',') : String(v)) : String(v);
+  if (s.indexOf('"') >= 0 || s.indexOf(d) >= 0 || /[\r\n]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+function toCSV(aoa, d){
+  return '\uFEFF' + aoa.map(function(r){ return r.map(function(c){ return csvCell(c, d); }).join(d); }).join('\r\n') + '\r\n';
+}
+function saveBlob(name, blob){
+  var url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(function(){ a.remove(); URL.revokeObjectURL(url); }, 1500);
+}
+function makeSheet(aoa, widths){
+  var ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = widths.map(function(w){ return { wch: w }; });
+  if (aoa.length > 1) ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: aoa.length - 1, c: aoa[0].length - 1 } }) };
+  return ws;
+}
+function distText(g){
+  return Array.from(g.counts.keys()).sort(function(a, b){ return a - b; }).map(function(w){ return kg(w) + ' kg × ' + g.counts.get(w); }).join('; ');
+}
+function anomAoa(rows){
+  var head = ['Tingkat', 'Tracking ID', 'Goods Description', 'Quantity', 'Berat (kg)', 'Mayoritas (kg)', 'Resi berat mayoritas', 'Jumlah resi di kelompok', 'Selisih (kg)', 'Arah'];
+  if (S.rate > 0) head.push('Perkiraan kelebihan biaya (Rp)');
+  var body = rows.map(function(r){
+    var seri = r.status === 'seri';
+    var row = [LVT[r.lvl], r.id, r.desc, r.qty, r.weight, seri ? null : r.base, seri ? null : r.baseC, r.baseN, seri ? null : r.diff, seri ? 'Seri (tanpa mayoritas)' : (r.diff > 0 ? 'Lebih berat' : 'Lebih ringan')];
+    if (S.rate > 0) row.push(!seri && r.diff > 0 ? r.diff * S.rate : 0);
+    return row;
+  });
+  return [head].concat(body);
+}
+function groupAoa(gs){
+  var head = ['Goods Description', 'Quantity', 'Jumlah resi', 'Berat mayoritas (kg)', 'Resi berat mayoritas', 'Porsi mayoritas (%)', 'Sebaran berat', 'Resi tidak wajar', 'Kelebihan (kg)', 'Status'];
+  var body = gs.map(function(g){
+    var seri = g.status === 'seri';
+    return [g.desc, g.qty, g.n, seri ? null : g.mode.w, seri ? null : g.mode.c, seri ? null : pct(g.mode.share), distText(g), seri ? g.nSeri : g.nAnom, g.excess, STT[g.status]];
+  });
+  return [head].concat(body);
+}
+function doExport(scope, kind){
+  if (!S.result) return;
+  var anom = scope === 'anom';
+  var rows = anom ? (S.aRows || []) : getProd();
+  if (!rows.length){ toast('Tidak ada data untuk diekspor.'); return; }
+  var main = anom ? anomAoa(rows) : groupAoa(rows);
+  var name = (anom ? 'resi-tidak-wajar_' : 'kelompok-berat_') + today();
+  try{
+    if (kind === 'xlsx'){
+      if (!window.XLSX){ toast('Pustaka Excel gagal dimuat (perlu internet). Coba ekspor CSV.'); return; }
+      var wb = XLSX.utils.book_new(), gw = [60, 9, 12, 16, 14, 14, 42, 14, 14, 16];
+      if (anom){
+        XLSX.utils.book_append_sheet(wb, makeSheet(main, [11, 20, 60, 9, 10, 14, 14, 14, 12, 22, 22]), 'Resi tidak wajar');
+        var probs = S.garr.filter(function(g){ return g.nAnom || g.nSeri; }).sort(function(a, b){ return (b.nAnom + b.nSeri) - (a.nAnom + a.nSeri) || b.n - a.n; });
+        XLSX.utils.book_append_sheet(wb, makeSheet(groupAoa(probs), gw), 'Kelompok bermasalah');
+      } else XLSX.utils.book_append_sheet(wb, makeSheet(main, gw), 'Kelompok');
+      var buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      saveBlob(name + '.xlsx', new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+      name += '.xlsx';
+    } else {
+      saveBlob(name + '.csv', new Blob([toCSV(main, kind.charAt(3))], { type: 'text/csv;charset=utf-8' }));
+      name += '.csv';
+    }
+    toast(name + ' diunduh (' + fmt(rows.length) + ' baris).');
+  }catch(err){
+    toast('Ekspor gagal. Coba format lain.');
+  }
+}
+
 /* ---------- event ---------- */
 function sortClick(st, rerender, defaults){
   return function(e){
@@ -780,13 +884,22 @@ function init(){
       ['p-anom', 'p-prod', 'p-how'].forEach(function(id){ $('#' + id).hidden = id !== t.getAttribute('aria-controls'); });
     });
   });
+  document.querySelectorAll('.menu').forEach(function(m){
+    m.addEventListener('click', function(e){
+      var b = e.target.closest('button[data-kind]'); if (!b) return;
+      m.open = false; doExport(b.dataset.scope, b.dataset.kind);
+    });
+  });
+  document.addEventListener('click', function(e){
+    document.querySelectorAll('.menu[open]').forEach(function(m){ if (!m.contains(e.target)) m.open = false; });
+  });
   $('#mClose').addEventListener('click', closeModal);
   $('#modal').addEventListener('click', function(e){
     if (e.target === this) { closeModal(); return; }
     var b = e.target.closest('button[data-copy]');
     if (b){ var t = b.getAttribute('data-copy'); copyText(t).then(function(ok){ if (ok) toast('Tracking ID disalin.'); else manualCopy(t); }); }
   });
-  document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !$('#modal').hidden) closeModal(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape'){ if (!$('#modal').hidden) closeModal(); document.querySelectorAll('.menu[open]').forEach(function(m){ m.open = false; }); } });
 
 }
 function loadSample(){
