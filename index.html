@@ -1,0 +1,802 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pelacak berat tidak wajar</title>
+<meta name="description" content="Deteksi resi dengan berat tidak wajar: bandingkan berat tiap resi dengan mayoritas berat untuk Goods Description dan Quantity yang sama. Data diproses di browser.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%E2%9A%96%EF%B8%8F%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#F1F3F7; --surface:#FFFFFF; --sunken:#E9ECF2; --ink:#17233A; --muted:#58637A; --line:#D7DCE6; --line-strong:#B9C1D0;
+  --teal:#0E8577; --teal-bg:#DDF2EE;
+  --amber:#E9A92B; --amber-ink:#8A5A00; --amber-bg:#FBEFCF;
+  --red:#C23B50; --red-bg:#F9DFE3;
+  --primary:#17233A; --on-primary:#FFFFFF; --focus:#2F6BFF;
+  --sans:"Schibsted Grotesk",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0D1524; --surface:#142038; --sunken:#1B2947; --ink:#E7ECF6; --muted:#95A1BA; --line:#25324E; --line-strong:#3A4A6C;
+    --teal:#38C4B0; --teal-bg:#12332F; --amber:#F2BE5B; --amber-ink:#F2BE5B; --amber-bg:#3A2D10;
+    --red:#F26A80; --red-bg:#40202A; --primary:#E7ECF6; --on-primary:#0D1524; --focus:#7FA3FF;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0D1524; --surface:#142038; --sunken:#1B2947; --ink:#E7ECF6; --muted:#95A1BA; --line:#25324E; --line-strong:#3A4A6C;
+  --teal:#38C4B0; --teal-bg:#12332F; --amber:#F2BE5B; --amber-ink:#F2BE5B; --amber-bg:#3A2D10;
+  --red:#F26A80; --red-bg:#40202A; --primary:#E7ECF6; --on-primary:#0D1524; --focus:#7FA3FF;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5;-webkit-text-size-adjust:100%}
+.wrap{max-width:1200px;margin:0 auto;padding:28px 20px 56px}
+h1{font-size:28px;line-height:1.15;margin:0 0 6px;font-weight:700;letter-spacing:-.01em}
+h2{font-size:16px;margin:0 0 10px;font-weight:600}
+h3{font-size:14px;margin:18px 0 8px;font-weight:600}
+p{margin:0}
+.lede{color:var(--muted);max-width:68ch}
+.top{margin-bottom:20px}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border:1px solid var(--line-strong);border-radius:6px;background:var(--surface);cursor:pointer;font-weight:500;font-size:14px;line-height:1.2}
+.btn:hover{background:var(--sunken)}
+.btn.primary{background:var(--primary);color:var(--on-primary);border-color:var(--primary)}
+.btn.primary:hover{opacity:.9;background:var(--primary)}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--muted)}
+.btn.small{padding:5px 10px;font-size:13px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:6px}
+.panel>summary{list-style:none;cursor:pointer;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;font-weight:600}
+.panel>summary::-webkit-details-marker{display:none}
+.panel>summary .chev{width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);margin-right:4px;flex:none}
+.panel[open]>summary .chev{transform:rotate(-135deg)}
+.panel[open]>summary{border-bottom:1px solid var(--line)}
+.sum-sub{font-weight:400;color:var(--muted);font-size:13px}
+.panel-body{padding:16px}
+textarea#input{width:100%;min-height:150px;resize:vertical;border:1px solid var(--line-strong);border-radius:6px;padding:10px 12px;background:var(--bg);font-family:var(--mono);font-size:12px;line-height:1.5;white-space:pre;overflow:auto}
+.actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px}
+.msg{font-size:13px;color:var(--muted);flex:1 1 220px}
+.msg.err{color:var(--red)} .msg.ok{color:var(--teal)} .msg.warn{color:var(--amber-ink)}
+.settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px 16px;margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+.field label{display:block;font-size:13px;font-weight:500;margin-bottom:4px}
+.field small{display:block;color:var(--muted);font-size:12px;margin-top:3px;line-height:1.35}
+.field input,.field select{width:100%;padding:7px 9px;border:1px solid var(--line-strong);border-radius:6px;background:var(--bg)}
+.note{margin:14px 0 0;padding:10px 14px;border-left:3px solid var(--amber);background:var(--amber-bg);color:var(--ink);font-size:14px;border-radius:0 6px 6px 0}
+#results{margin-top:20px}
+/* KPI band */
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface);border:1px solid var(--line);border-radius:6px}
+.kpi{padding:14px 16px;border-right:1px solid var(--line);min-width:0}
+.kpi:last-child{border-right:0}
+.kpi .k-l{font-size:13px;color:var(--muted)}
+.kpi .k-v{font-size:26px;font-weight:700;line-height:1.2;font-variant-numeric:tabular-nums;letter-spacing:-.01em;overflow-wrap:anywhere}
+.kpi .k-s{font-size:12px;color:var(--muted);margin-top:2px}
+.kpi.hot .k-v{color:var(--red)}
+.kpi-extra{font-size:13px;color:var(--muted);margin:8px 2px 0}
+/* overview */
+.overview{display:grid;grid-template-columns:1.25fr 1fr;gap:16px;margin-top:16px}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px 16px;min-width:0}
+.bars{display:flex;flex-direction:column;gap:7px}
+.bar-row{display:grid;grid-template-columns:minmax(0,150px) 1fr 76px;align-items:center;gap:10px;font-size:13px;width:100%;padding:0;border:0;background:none;text-align:left;cursor:default}
+button.bar-row{cursor:pointer}
+button.bar-row:hover .bar-name{text-decoration:underline}
+.bar-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-track{height:12px;background:var(--sunken);border-radius:3px;overflow:hidden}
+.bar-fill{display:block;height:100%;background:var(--amber);border-radius:3px;min-width:2px}
+.bar-fill.teal{background:var(--teal)}
+.bar-val{font-variant-numeric:tabular-nums;color:var(--muted);text-align:right;white-space:nowrap}
+.empty{color:var(--muted);font-size:14px;padding:6px 0}
+/* tabs */
+.tabs{display:flex;gap:2px;margin:22px 0 0;border-bottom:1px solid var(--line-strong);overflow-x:auto}
+.tab{padding:9px 16px;border:1px solid transparent;border-bottom:0;background:none;cursor:pointer;font-weight:500;color:var(--muted);border-radius:6px 6px 0 0;white-space:nowrap}
+.tab[aria-selected="true"]{background:var(--surface);color:var(--ink);border-color:var(--line-strong);margin-bottom:-1px;padding-bottom:10px;font-weight:600}
+.tabpanel{background:var(--surface);border:1px solid var(--line-strong);border-top:0;border-radius:0 0 6px 6px;padding:16px}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px 12px;align-items:center;margin-bottom:12px}
+.toolbar input[type=search],.toolbar select{padding:7px 9px;border:1px solid var(--line-strong);border-radius:6px;background:var(--bg);min-width:0}
+.toolbar input[type=search]{flex:1 1 200px;max-width:320px}
+.chk{display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer}
+.spacer{flex:1}
+.count{font-size:13px;color:var(--muted)}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:6px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+thead th{background:var(--sunken);font-weight:600;white-space:nowrap;position:sticky;top:0}
+thead th button{all:unset;cursor:pointer;display:inline-flex;gap:4px;align-items:center}
+thead th button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+thead th .arr{font-size:10px;color:var(--muted)}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--sunken)}
+tbody tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.mono{font-family:var(--mono);font-size:12px}
+.pname{font-weight:600}
+.psub{display:block;color:var(--muted);font-size:12px}
+.desc{max-width:340px;color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap}
+.chip.tinggi{background:var(--red-bg);color:var(--red)}
+.chip.sedang{background:var(--amber-bg);color:var(--amber-ink)}
+.chip.rendah{background:var(--sunken);color:var(--muted)}
+.chip.ambigu{border:1px dashed var(--line-strong);color:var(--muted)}
+.chip.lemah{border:1px solid var(--amber);color:var(--amber-ink)}
+.chip.konsisten{background:var(--teal-bg);color:var(--teal)}
+.chip.sedikit{background:var(--sunken);color:var(--muted)}
+.diff-up{color:var(--red);font-weight:600}
+.diff-down{color:var(--amber-ink);font-weight:600}
+.hint-same{color:var(--red);font-weight:500}
+.hint-other{color:var(--muted)}
+.more{display:flex;justify-content:center;margin-top:12px}
+/* weight spectrum */
+.spec{display:inline-flex;align-items:flex-end;gap:7px;min-height:42px}
+.bin{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px}
+.bin i{display:block;width:13px;background:var(--amber);border-radius:2px 2px 0 0}
+.bin.is-base i{background:var(--teal)}
+.bin b{font-size:10px;line-height:1;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
+.spec .plus{font-size:11px;color:var(--muted);align-self:center}
+/* modal */
+.modal{position:fixed;inset:0;z-index:50;background:rgba(10,16,30,.55);display:flex;align-items:flex-start;justify-content:center;padding:calc(24px + env(safe-area-inset-top,0px)) 16px calc(24px + env(safe-area-inset-bottom,0px));overflow-y:auto}
+.modal[hidden]{display:none}
+.sheet{position:relative;background:var(--surface);border:1px solid var(--line-strong);border-radius:8px;width:100%;max-width:880px;padding:22px 22px 24px}
+.close{position:absolute;top:10px;right:10px;width:34px;height:34px;border:0;background:none;font-size:24px;line-height:1;cursor:pointer;color:var(--muted);border-radius:6px}
+.close:hover{background:var(--sunken)}
+.sheet h2{font-size:20px;margin:0 28px 2px 0}
+.sheet .sub{color:var(--muted);font-size:13px;margin-bottom:6px}
+.finding{margin:8px 0;padding-left:12px;border-left:3px solid var(--line-strong);font-size:14px}
+.finding.bad{border-left-color:var(--red)}
+.matrix td,.matrix th{text-align:center}
+.matrix td:first-child,.matrix th:first-child{text-align:left}
+.matrix tbody tr{cursor:default}
+.cell-base{background:var(--teal-bg);color:var(--teal);font-weight:600}
+.cell-dev{background:var(--amber-bg);color:var(--amber-ink);font-weight:600}
+.cell-zero{color:var(--line-strong)}
+.causes{margin:6px 0 0;padding-left:18px;color:var(--muted);font-size:13px}
+.causes li{margin:2px 0}
+tr.hl td{background:var(--amber-bg)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--primary);color:var(--on-primary);padding:9px 16px;border-radius:6px;font-size:14px;z-index:60;max-width:90vw}
+.toast[hidden]{display:none}
+.method p{margin:0 0 10px;max-width:74ch}
+.method ol{margin:0 0 10px;padding-left:20px;max-width:74ch}
+.method li{margin:6px 0}
+.privacy{font-size:13px;color:var(--muted);margin-top:14px}
+@media (max-width:900px){
+  .kpis{grid-template-columns:repeat(2,1fr)}
+  .kpi{border-bottom:1px solid var(--line)}
+  .kpi:nth-child(2n){border-right:0}
+  .kpi:last-child{grid-column:1/-1;border-bottom:0;border-right:0}
+  .overview{grid-template-columns:1fr}
+}
+@media (max-width:560px){
+  .wrap{padding:20px 14px 44px}
+  h1{font-size:23px}
+  .bar-row{grid-template-columns:minmax(0,110px) 1fr 64px}
+  .sheet{padding:18px 14px 20px}
+}
+
+.gdesc{max-width:440px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;font-weight:600}
+.chip.seri{border:1px dashed var(--amber);color:var(--amber-ink)}
+.ids{font-family:var(--mono);font-size:12px;line-height:1.7;overflow-wrap:anywhere;margin:2px 0 6px;padding:8px 10px;background:var(--sunken);border-radius:6px}
+.idhead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;font-size:14px}
+.sheet h2.long{font-size:17px;overflow-wrap:anywhere;line-height:1.3}
+.settings.one{grid-template-columns:minmax(200px,320px)}
+.pill{display:inline-block;padding:1px 7px;border-radius:99px;background:var(--sunken);font-size:12px;color:var(--muted)}
+mark{background:var(--amber-bg);color:var(--ink);padding:0 3px;border-radius:3px;font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Pelacak berat tidak wajar</h1>
+    <p class="lede">Resi dikelompokkan berdasarkan Goods Description dan Quantity yang sama. Berat yang paling banyak dalam kelompok dianggap normal. Resi mana pun yang beratnya berbeda otomatis masuk daftar tidak wajar.</p>
+  </header>
+
+  <details class="panel" id="dataPanel" open>
+    <summary><span>Data resi <span class="sum-sub" id="sumText"></span></span><span class="chev" aria-hidden="true"></span></summary>
+    <div class="panel-body">
+      <textarea id="input" spellcheck="false" aria-label="Data resi" placeholder="Tempel data di sini, atau unggah file CSV/Excel di bawah.&#10;Kolom yang dibaca: TRACKING ID, Goods Description, Quantity, Weight (urutan bebas selama ada baris judul)"></textarea>
+      <div class="actions">
+        <button type="button" class="btn primary" id="btnRun">Analisis data</button>
+        <label class="btn" for="file" tabindex="0" id="fileLbl">Unggah file (.csv, .xlsx, .txt)</label>
+        <input type="file" id="file" hidden accept=".xlsx,.xls,.csv,.tsv,.txt">
+        <button type="button" class="btn" id="btnSample">Muat contoh</button>
+        <button type="button" class="btn ghost" id="btnClear">Kosongkan</button>
+        <span class="msg" id="msg" role="status"></span>
+      </div>
+      <div class="settings one">
+        <div class="field">
+          <label for="oRate">Tarif per kg (Rp, opsional)</label>
+          <input type="number" id="oRate" min="0" step="500" value="0">
+          <small>Dipakai untuk menghitung perkiraan kelebihan biaya dari resi yang lebih berat.</small>
+        </div>
+      </div>
+      <p class="privacy">Data diproses di browser Anda dan tidak dikirim ke server mana pun.</p>
+    </div>
+  </details>
+
+  <div class="note" id="sampleNote" hidden>Yang tampil sekarang adalah data contoh rekaan, bukan data Anda. Unggah file CSV Anda di atas atau tempel datanya, lalu klik Analisis data.</div>
+
+  <section id="results" hidden>
+    <div class="kpis" id="kpis"></div>
+    <p class="kpi-extra" id="kpiExtra"></p>
+
+    <div class="overview">
+      <div class="box">
+        <h2>Kelompok dengan resi tidak wajar terbanyak</h2>
+        <div class="bars" id="topBars"></div>
+      </div>
+      <div class="box">
+        <h2>Sebaran berat semua resi</h2>
+        <div class="bars" id="distBars"></div>
+        <p class="count" style="margin-top:8px">Panjang batang memakai skala akar supaya berat yang jarang tetap terlihat.</p>
+      </div>
+    </div>
+
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="t-anom" aria-selected="true" aria-controls="p-anom" type="button">Resi tidak wajar</button>
+      <button class="tab" role="tab" id="t-prod" aria-selected="false" aria-controls="p-prod" type="button">Per kelompok</button>
+      <button class="tab" role="tab" id="t-how" aria-selected="false" aria-controls="p-how" type="button">Cara kerja</button>
+    </div>
+
+    <div class="tabpanel" id="p-anom" role="tabpanel" aria-labelledby="t-anom">
+      <div class="toolbar">
+        <input type="search" id="aQ" placeholder="Cari Tracking ID atau Goods Description" aria-label="Cari Tracking ID atau Goods Description">
+        <select id="aLvl" aria-label="Tingkat">
+          <option value="">Semua tingkat</option>
+          <option value="tinggi">Tinggi</option>
+          <option value="sedang">Sedang</option>
+          <option value="rendah">Rendah</option>
+          <option value="seri">Seri (tanpa mayoritas)</option>
+        </select>
+        <select id="aDir" aria-label="Arah selisih">
+          <option value="">Lebih berat dan lebih ringan</option>
+          <option value="up">Hanya lebih berat</option>
+          <option value="down">Hanya lebih ringan</option>
+        </select>
+        <label class="chk"><input type="checkbox" id="aSeri" checked> Sertakan kelompok seri</label>
+        <span class="spacer"></span>
+        <span class="count" id="aCount"></span>
+        <button type="button" class="btn small" id="aCopy">Salin hasil</button>
+      </div>
+      <div class="scroll"><table id="aTable">
+        <thead><tr>
+          <th><button type="button" data-k="lvl">Tingkat <span class="arr"></span></button></th>
+          <th><button type="button" data-k="id">Tracking ID <span class="arr"></span></button></th>
+          <th><button type="button" data-k="desc">Goods Description <span class="arr"></span></button></th>
+          <th class="num"><button type="button" data-k="qty">Qty <span class="arr"></span></button></th>
+          <th class="num"><button type="button" data-k="weight">Berat (kg) <span class="arr"></span></button></th>
+          <th class="num"><button type="button" data-k="base">Mayoritas <span class="arr"></span></button></th>
+          <th class="num"><button type="button" data-k="diff">Selisih (kg) <span class="arr"></span></button></th>
+        </tr></thead>
+        <tbody id="aBody"></tbody>
+      </table></div>
+      <div class="more"><button type="button" class="btn" id="aMore" hidden>Tampilkan 150 lagi</button></div>
+    </div>
+
+    <div class="tabpanel" id="p-prod" role="tabpanel" aria-labelledby="t-prod" hidden>
+      <div class="toolbar">
+        <input type="search" id="pQ" placeholder="Cari Goods Description" aria-label="Cari Goods Description">
+        <label class="chk"><input type="checkbox" id="pOnly" checked> Hanya yang bermasalah</label>
+        <span class="spacer"></span>
+        <span class="count" id="pCount"></span>
+      </div>
+      <div class="scroll"><table id="pTable">
+        <thead><tr>
+          <th><button type="button" data-k="desc">Goods Description <span class="arr"></span></button></th>
+          <th class="num"><button type="button" data-k="qty">Qty <span class="arr"></span></button></th>
+          <th class="num"><button type="button" data-k="n">Jumlah resi <span class="arr"></span></button></th>
+          <th>Sebaran berat (kg)</th>
+          <th class="num"><button type="button" data-k="share">Mayoritas <span class="arr"></span></button></th>
+          <th class="num"><button type="button" data-k="nAnom">Tidak wajar <span class="arr"></span></button></th>
+          <th class="num"><button type="button" data-k="excess">Kelebihan (kg) <span class="arr"></span></button></th>
+          <th>Status</th>
+        </tr></thead>
+        <tbody id="pBody"></tbody>
+      </table></div>
+      <div class="more"><button type="button" class="btn" id="pMore" hidden>Tampilkan 150 lagi</button></div>
+    </div>
+
+    <div class="tabpanel method" id="p-how" role="tabpanel" aria-labelledby="t-how" hidden>
+      <h2>Cara tool ini menilai</h2>
+      <ol>
+        <li>Resi dikelompokkan berdasarkan <b>Goods Description yang sama persis</b> dan <b>Quantity yang sama</b>. Perbedaan huruf besar atau kecil dan spasi ganda diabaikan, selain itu harus identik.</li>
+        <li>Dalam tiap kelompok, berat yang paling banyak muncul menjadi berat normal (mayoritas). Contoh: FruitReach | RZZ dengan Quantity 1 punya 192 resi, 188 berat 1 kg, jadi 1 kg adalah normalnya.</li>
+        <li>Setiap resi yang beratnya berbeda dari mayoritas langsung masuk tidak wajar, tanpa ambang batas. Termasuk berat 0 kg dan resi yang lebih ringan.</li>
+        <li>Jika dua berat atau lebih sama banyaknya sehingga tidak ada mayoritas, semua resi di kelompok itu ditandai <b>Seri</b>. Anda perlu menentukan sendiri mana yang benar.</li>
+        <li>Kelompok yang hanya punya 1 resi tidak bisa dibandingkan, jadi tidak ditandai.</li>
+        <li>Tingkat: <b>Tinggi</b> bila selisih 3 kg atau lebih, atau berat 3 kali mayoritas. <b>Sedang</b> bila 1,5 kali mayoritas atau lebih, atau berat turun separuh atau lebih. <b>Rendah</b> untuk sisanya.</li>
+      </ol>
+      <p>Batasan: kalau Goods Description yang sama ditulis sedikit berbeda, misalnya ada catatan pembeli di ujungnya, resi itu masuk kelompok lain dan tidak terbandingkan. Klik baris mana pun untuk melihat sebaran berat lengkap dan daftar Tracking ID yang menyimpang.</p>
+    </div>
+  </section>
+</div>
+
+<div class="modal" id="modal" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+    <button type="button" class="close" id="mClose" aria-label="Tutup">&times;</button>
+    <div id="mBody"></div>
+  </div>
+</div>
+<div class="toast" id="toast" hidden role="status"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+/* ===== LOGIKA ANALISIS v2 (murni, tanpa DOM) =====
+   Aturan: resi dikelompokkan berdasarkan Goods Description + Quantity yang sama.
+   Berat mayoritas dalam kelompok = baseline. Resi dengan berat berbeda = tidak wajar. */
+function normDesc(s){
+  return String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
+}
+function descKey(s){
+  return normDesc(s).normalize('NFKC').toLowerCase();
+}
+function trimCell(s){ return String(s == null ? '' : s).trim(); }
+
+function parseDelimited(text, d){
+  var rows = [], row = [], cur = '', q = false, i, ch;
+  var flush = function(){ row.push(cur); cur = ''; if (row.some(function(c){ return c.trim() !== ''; })) rows.push(row); row = []; };
+  for (i = 0; i < text.length; i++){
+    ch = text[i];
+    if (q){
+      if (ch === '"'){ if (text[i + 1] === '"'){ cur += '"'; i++; } else q = false; }
+      else cur += ch;
+    } else if (ch === '"' && cur === '') q = true;
+    else if (ch === d){ row.push(cur); cur = ''; }
+    else if (ch === '\n' || ch === '\r'){ if (ch === '\r' && text[i + 1] === '\n') i++; flush(); }
+    else cur += ch;
+  }
+  if (cur !== '' || row.length) flush();
+  return rows.map(function(r){ return r.map(trimCell); });
+}
+
+function textToCells(text){
+  text = String(text).replace(/^\uFEFF/, '');
+  var lines = text.split(/\r?\n/).filter(function(l){ return l.trim().length; });
+  if (!lines.length) return [];
+  var first = lines[0], hdr = /track|resi|awb|goods|weight|berat|quantity|qty/i.test(first);
+  if (first.indexOf('\t') < 0 && hdr){
+    if (first.indexOf(',') >= 0) return parseDelimited(text, ',');
+    if (first.indexOf(';') >= 0) return parseDelimited(text, ';');
+  }
+  return lines.map(function(line){
+    if (line.indexOf('\t') >= 0) return line.split('\t').map(trimCell);
+    var m = line.trim().match(/^(\S+)\s+(\d+(?:[.,]\d+)?)\s+(.+?)\s+(\d+)$/);
+    if (m) return [m[1], m[2], m[3], m[4]];
+    return parseDelimited(line, line.indexOf(';') >= 0 && line.indexOf(',') < 0 ? ';' : ',')[0] || [];
+  });
+}
+
+function toNum(s){
+  if (typeof s === 'number') return s;
+  s = String(s).trim().replace(/\s/g, '');
+  if (/^\d+,\d+$/.test(s)) s = s.replace(',', '.');
+  return parseFloat(s);
+}
+
+/* cellRows: array of array string -> {rows, skipped, dupes} */
+function parseTable(cellRows){
+  var map = null, start = 0;
+  if (cellRows.length){
+    var h = cellRows[0].map(function(c){ return String(c).toLowerCase(); });
+    var hasHeadWord = h.some(function(c){ return /track|resi|awb|weight|berat|goods|quantity|qty/.test(c); });
+    var numericCell = cellRows[0].some(function(c, i){ return i > 0 && /^\d+([.,]\d+)?$/.test(String(c).trim()); });
+    if (hasHeadWord && !numericCell){
+      start = 1;
+      var find = function(re){ return h.findIndex(function(c){ return re.test(c); }); };
+      map = { id: find(/track|resi|awb/), w: find(/weight|berat/), d: find(/goods|desc|produk|barang|nama/), q: find(/qty|quantity|jumlah/), len: h.length };
+      if (map.id < 0 || map.w < 0 || map.d < 0 || map.q < 0) map = null;
+    }
+  }
+  var rows = [], skipped = 0, seen = Object.create(null), dupes = 0;
+  for (var i = start; i < cellRows.length; i++){
+    var c = cellRows[i], id, w, d, q;
+    if (map && c.length >= map.len){
+      var extra = c.length - map.len, pick = function(j){ return j < map.d ? c[j] : (j === map.d ? c.slice(map.d, map.d + extra + 1).join(',') : c[j + extra]); };
+      id = pick(map.id); w = pick(map.w); d = pick(map.d); q = pick(map.q);
+    } else if (!map && c.length >= 4){ id = c[0]; w = c[1]; q = c[c.length - 1]; d = c.slice(2, c.length - 1).join(' '); }
+    else { skipped++; continue; }
+    w = toNum(w); q = parseInt(String(q).trim(), 10);
+    id = String(id).trim();
+    if (!id || !isFinite(w) || w < 0 || !isFinite(q) || q < 1){ skipped++; continue; }
+    if (seen[id]) dupes++; seen[id] = 1;
+    rows.push({ id: id, weight: w, qty: q, desc: normDesc(d), dkey: descKey(d) });
+  }
+  return { rows: rows, skipped: skipped, dupes: dupes };
+}
+
+function inc(m, k){ m.set(k, (m.get(k) || 0) + 1); }
+function modeOf(counts){
+  var w = null, c = 0, total = 0;
+  counts.forEach(function(v, k){ total += v; if (v > c || (v === c && k < w)){ w = k; c = v; } });
+  return { w: w, c: c, total: total, share: total ? c / total : 0 };
+}
+
+function analyze(rows){
+  var groups = new Map();
+  rows.forEach(function(r){
+    var key = r.dkey + '\u0001' + r.qty, g = groups.get(key);
+    if (!g){ g = { key: key, desc: r.desc, qty: r.qty, rows: [], counts: new Map() }; groups.set(key, g); }
+    g.rows.push(r); inc(g.counts, r.weight);
+  });
+  var kpi = { total: rows.length, groups: groups.size, compGroups: 0, singles: 0, anom: 0, anomGroups: 0, heavy: 0, light: 0, excess: 0, tieRows: 0, tieGroups: 0 };
+  groups.forEach(function(g){
+    g.n = g.rows.length; g.mode = modeOf(g.counts);
+    var tied = 0; g.counts.forEach(function(v){ if (v === g.mode.c) tied++; });
+    g.nAnom = 0; g.nSeri = 0; g.excess = 0;
+    if (g.n === 1) g.status = 'tunggal';
+    else if (g.counts.size === 1) g.status = 'konsisten';
+    else if (tied > 1) g.status = 'seri';
+    else g.status = 'anomali';
+    if (g.n >= 2) kpi.compGroups++; else kpi.singles++;
+    g.rows.forEach(function(r){
+      r.gk = g.key; r.status = 'ok'; r.lvl = null; r.base = null; r.baseC = g.mode.c; r.baseN = g.n; r.diff = 0; r.ratio = null;
+      if (g.status === 'anomali'){
+        r.base = g.mode.w;
+        if (r.weight !== g.mode.w){
+          r.status = 'anomali'; r.diff = r.weight - g.mode.w; r.ratio = g.mode.w > 0 ? r.weight / g.mode.w : null;
+          if (r.diff > 0){
+            r.lvl = (r.diff >= 3 || (r.ratio !== null && r.ratio >= 3)) ? 'tinggi' : ((r.ratio === null || r.ratio >= 1.5) ? 'sedang' : 'rendah');
+            g.excess += r.diff; kpi.heavy++;
+          } else {
+            r.lvl = (r.ratio !== null && r.ratio <= 0.5) ? 'sedang' : 'rendah'; kpi.light++;
+          }
+          g.nAnom++; kpi.anom++;
+        }
+      } else if (g.status === 'seri'){
+        r.status = 'seri'; r.lvl = 'seri'; g.nSeri++; kpi.tieRows++;
+      }
+    });
+    kpi.excess += g.excess;
+    if (g.status === 'anomali') kpi.anomGroups++;
+    if (g.status === 'seri') kpi.tieGroups++;
+  });
+  return { groups: groups, rows: rows, kpi: kpi };
+}
+
+var SAMPLE=[["DEMO-A-001","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-002","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-003","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-004","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-005","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-006","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-007","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-008","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-009","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-010","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-011","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-012","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-013","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-014","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-015","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-016","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-017","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-018","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-019","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-020","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-021","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-022","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-023","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-024","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-025","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-026","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-027","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-028","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-029","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-030","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-031","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-032","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-033","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-034","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-035","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-036","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-037","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-038","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-039","Produk Contoh A | KODE-1 Varian: Merah",1,2],["DEMO-A-040","Produk Contoh A | KODE-1 Varian: Merah",1,2],["DEMO-B-001","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-002","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-003","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-004","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-005","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-006","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-007","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-008","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-009","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-010","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-011","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-012","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-013","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-014","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-015","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-016","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-017","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-018","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-019","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-020","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-021","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-022","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-023","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-024","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-025","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-026","Produk Contoh B | KODE-2 Paket isi 2",2,0],["DEMO-C-001","Produk Contoh C | KODE-3 Varian: Biru",1,1],["DEMO-C-002","Produk Contoh C | KODE-3 Varian: Biru",1,2],["DEMO-D-001","Produk Contoh D | KODE-4 Ukuran: L",1,1],["DEMO-D-002","Produk Contoh D | KODE-4 Ukuran: L",1,1],["DEMO-D-003","Produk Contoh D | KODE-4 Ukuran: L",1,1],["DEMO-D-004","Produk Contoh D | KODE-4 Ukuran: L",1,1],["DEMO-D-005","Produk Contoh D | KODE-4 Ukuran: L",1,1],["DEMO-D-006","Produk Contoh D | KODE-4 Ukuran: L",1,1],["DEMO-D-007","Produk Contoh D | KODE-4 Ukuran: L",1,1],["DEMO-D-008","Produk Contoh D | KODE-4 Ukuran: L",1,1],["DEMO-D-009","Produk Contoh D | KODE-4 Ukuran: L",1,1],["DEMO-D-010","Produk Contoh D | KODE-4 Ukuran: L",1,1],["DEMO-D-011","Produk Contoh D | KODE-4 Ukuran: L",1,1],["DEMO-D-012","Produk Contoh D | KODE-4 Ukuran: L",1,1],["DEMO-D-013","Produk Contoh D | KODE-4 Ukuran: L",1,1],["DEMO-D-014","Produk Contoh D | KODE-4 Ukuran: L",1,1],["DEMO-D-015","Produk Contoh D | KODE-4 Ukuran: L",1,1],["DEMO-D-016","Produk Contoh D | KODE-4 Ukuran: L",1,4],["DEMO-E-001","Produk Contoh E | KODE-5 Varian: Hijau",1,1],["DEMO-E-002","Produk Contoh E | KODE-5 Varian: Hijau",1,1],["DEMO-E-003","Produk Contoh E | KODE-5 Varian: Hijau",1,1],["DEMO-E-004","Produk Contoh E | KODE-5 Varian: Hijau",1,1],["DEMO-E-005","Produk Contoh E | KODE-5 Varian: Hijau",1,1],["DEMO-E-006","Produk Contoh E | KODE-5 Varian: Hijau",1,1],["DEMO-E-007","Produk Contoh E | KODE-5 Varian: Hijau",1,1],["DEMO-E-008","Produk Contoh E | KODE-5 Varian: Hijau",1,1],["DEMO-E-009","Produk Contoh E | KODE-5 Varian: Hijau",1,1],["DEMO-E-010","Produk Contoh E | KODE-5 Varian: Hijau",1,1],["DEMO-E-011","Produk Contoh E | KODE-5 Varian: Hijau",1,1],["DEMO-E-012","Produk Contoh E | KODE-5 Varian: Hijau",1,1]];
+
+(function(){
+'use strict';
+var $ = function(s){ return document.querySelector(s); };
+var S = {
+  rows: [], skipped: 0, dupes: 0, result: null, isSample: false, rate: 0,
+  a: { sort: 'lvl', dir: 1, shown: 150, q: '', lvl: '', dirf: '', seri: true },
+  p: { sort: 'nAnom', dir: -1, shown: 150, q: '', only: true }
+};
+var STEP = 150;
+
+function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function fmt(n){ return Number(n).toLocaleString('id-ID'); }
+function kg(n){ return Number.isInteger(n) ? String(n) : n.toFixed(1).replace('.', ','); }
+function pct(x){ return Math.round(x * 100); }
+function rp(n){ return 'Rp ' + Math.round(n).toLocaleString('id-ID'); }
+function sgn(n){ return (n > 0 ? '+' : '') + kg(n); }
+
+function loadRate(){ try{ var v = parseFloat(localStorage.getItem('pbt2.rate')); if (isFinite(v) && v >= 0) S.rate = v; }catch(e){} $('#oRate').value = S.rate; }
+function readRate(){ var v = parseFloat($('#oRate').value); S.rate = isFinite(v) && v >= 0 ? v : 0; try{ localStorage.setItem('pbt2.rate', String(S.rate)); }catch(e){} }
+
+function msg(t, cls){ var m = $('#msg'); m.textContent = t || ''; m.className = 'msg' + (cls ? ' ' + cls : ''); }
+var toastT;
+function toast(t){ var el = $('#toast'); el.textContent = t; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(function(){ el.hidden = true; }, 2800); }
+
+/* ---------- alur data ---------- */
+function handle(p, sample){
+  if (!p.rows.length){ msg('Tidak ada baris yang terbaca. Pastikan ada kolom TRACKING ID, Goods Description, Quantity, dan Weight.', 'err'); return; }
+  S.rows = p.rows; S.skipped = p.skipped; S.dupes = p.dupes; S.isSample = !!sample;
+  recompute();
+  var extra = [];
+  if (p.skipped) extra.push(fmt(p.skipped) + ' baris dilewati karena tidak lengkap');
+  if (p.dupes) extra.push(fmt(p.dupes) + ' Tracking ID muncul lebih dari sekali');
+  msg((sample ? 'Contoh dimuat: ' : 'Terbaca ') + fmt(p.rows.length) + ' baris' + (extra.length ? '. ' + extra.join('; ') : '.'), extra.length ? 'warn' : 'ok');
+  $('#sumText').textContent = (sample ? '(contoh, ' : '(') + fmt(p.rows.length) + ' baris)';
+  $('#sampleNote').hidden = !sample;
+  if (!sample) $('#dataPanel').open = false;
+}
+function runText(){
+  var t = $('#input').value.trim();
+  if (!t){ msg('Tempel data dulu atau unggah file.', 'warn'); return; }
+  handle(parseTable(textToCells(t)), false);
+}
+function recompute(){
+  S.result = analyze(S.rows);
+  var i = 0; S.garr = [];
+  S.result.groups.forEach(function(g){ g.i = i++; S.garr.push(g); });
+  S.result.rows.forEach(function(r){ r.gi = S.result.groups.get(r.gk).i; });
+  S.a.shown = STEP; S.p.shown = STEP;
+  $('#results').hidden = false;
+  renderKPI(); renderOverview(); renderAnom(); renderProd();
+}
+
+/* ---------- KPI ---------- */
+function renderKPI(){
+  var k = S.result.kpi, rate = S.rate;
+  var cells = [
+    { l: 'Resi dianalisis', v: fmt(k.total), s: fmt(k.groups) + ' kelompok' + (S.dupes ? ', ' + fmt(S.dupes) + ' ID ganda' : '') },
+    { l: 'Resi tidak wajar', v: fmt(k.anom), s: fmt(k.heavy) + ' lebih berat, ' + fmt(k.light) + ' lebih ringan', hot: k.anom > 0 },
+    { l: 'Kelompok bermasalah', v: fmt(k.anomGroups), s: 'dari ' + fmt(k.compGroups) + ' kelompok yang bisa dibandingkan', hot: k.anomGroups > 0 },
+    { l: 'Kelebihan berat', v: fmt(Math.round(k.excess * 10) / 10) + ' kg', s: 'total selisih resi yang lebih berat' },
+    { l: 'Perkiraan kelebihan biaya', v: rate > 0 ? rp(k.excess * rate) : 'Belum dihitung', s: rate > 0 ? 'selisih kg dikali ' + rp(rate) + ' per kg' : 'isi tarif per kg di pengaturan' }
+  ];
+  $('#kpis').innerHTML = cells.map(function(c){ return '<div class="kpi' + (c.hot ? ' hot' : '') + '"><div class="k-l">' + c.l + '</div><div class="k-v">' + c.v + '</div><div class="k-s">' + c.s + '</div></div>'; }).join('');
+  var ex = [];
+  if (k.tieRows) ex.push(fmt(k.tieRows) + ' resi di ' + fmt(k.tieGroups) + ' kelompok seri (tanpa berat mayoritas) ditandai terpisah dan tidak masuk hitungan di atas');
+  if (k.singles) ex.push(fmt(k.singles) + ' resi punya Goods Description dan Quantity yang unik, jadi belum ada pembanding');
+  $('#kpiExtra').textContent = ex.length ? 'Catatan: ' + ex.join('; ') + '.' : '';
+}
+
+/* ---------- ikhtisar ---------- */
+function gLabel(g){ return g.desc + (g.qty !== 1 ? ' (qty ' + g.qty + ')' : ''); }
+function renderOverview(){
+  var gs = S.garr.filter(function(g){ return g.nAnom > 0; }).sort(function(a, b){ return b.nAnom - a.nAnom || b.excess - a.excess; }).slice(0, 8);
+  var max = gs.length ? gs[0].nAnom : 1;
+  $('#topBars').innerHTML = gs.length ? gs.map(function(g){
+    return '<button type="button" class="bar-row" data-gi="' + g.i + '"><span class="bar-name" title="' + esc(gLabel(g)) + '">' + esc(gLabel(g)) + '</span><span class="bar-track"><span class="bar-fill" style="width:' + Math.max(3, g.nAnom / max * 100) + '%"></span></span><span class="bar-val">' + g.nAnom + ' resi</span></button>';
+  }).join('') : '<p class="empty">Tidak ada resi yang beratnya berbeda dari mayoritas kelompoknya.</p>';
+
+  var counts = new Map(); S.result.rows.forEach(function(r){ inc(counts, r.weight); });
+  var ws = Array.from(counts.keys()).sort(function(a, b){ return a - b; });
+  var shown = ws.slice(0, 9), rest = ws.slice(9), restN = rest.reduce(function(s, w){ return s + counts.get(w); }, 0);
+  var mx = Math.max.apply(null, Array.from(counts.values()));
+  var top = Array.from(counts.entries()).sort(function(a, b){ return b[1] - a[1]; })[0][0];
+  var html = shown.map(function(w){
+    var c = counts.get(w);
+    return '<div class="bar-row"><span class="bar-name">' + kg(w) + ' kg</span><span class="bar-track"><span class="bar-fill ' + (w === top ? 'teal' : '') + '" style="width:' + Math.max(2, Math.sqrt(c / mx) * 100) + '%"></span></span><span class="bar-val">' + fmt(c) + ' resi</span></div>';
+  }).join('');
+  if (rest.length) html += '<div class="bar-row"><span class="bar-name">&gt; ' + kg(shown[shown.length - 1]) + ' kg</span><span class="bar-track"><span class="bar-fill" style="width:' + Math.max(2, Math.sqrt(restN / mx) * 100) + '%"></span></span><span class="bar-val">' + fmt(restN) + ' resi</span></div>';
+  $('#distBars').innerHTML = html;
+}
+
+function spectrum(g){
+  var ws = Array.from(g.counts.keys()).sort(function(a, b){ return a - b; });
+  var max = Math.max.apply(null, Array.from(g.counts.values()));
+  return '<span class="spec">' + ws.slice(0, 8).map(function(w){
+    var c = g.counts.get(w), h = Math.max(4, Math.round(26 * Math.sqrt(c / max)));
+    return '<span class="bin ' + (w === g.mode.w ? 'is-base' : '') + '" title="' + kg(w) + ' kg: ' + c + ' resi"><i style="height:' + h + 'px"></i><b>' + kg(w) + '</b></span>';
+  }).join('') + (ws.length > 8 ? '<span class="plus">+' + (ws.length - 8) + '</span>' : '') + '</span>';
+}
+
+/* ---------- tabel resi tidak wajar ---------- */
+var LVO = { tinggi: 0, sedang: 1, rendah: 2, seri: 3 };
+var LVT = { tinggi: 'Tinggi', sedang: 'Sedang', rendah: 'Rendah', seri: 'Seri' };
+var CMP = {
+  lvl: function(a, b){ return LVO[a.lvl] - LVO[b.lvl] || b.diff - a.diff || a.desc.localeCompare(b.desc); },
+  id: function(a, b){ return a.id.localeCompare(b.id); },
+  desc: function(a, b){ return a.desc.localeCompare(b.desc) || a.qty - b.qty; },
+  qty: function(a, b){ return a.qty - b.qty; },
+  weight: function(a, b){ return a.weight - b.weight; },
+  base: function(a, b){ return (a.base == null ? -1 : a.base) - (b.base == null ? -1 : b.base); },
+  diff: function(a, b){ return a.diff - b.diff; }
+};
+function getAnom(){
+  var a = S.a, q = a.q.toLowerCase();
+  var rows = S.result.rows.filter(function(r){
+    if (r.status === 'ok') return false;
+    if (r.status === 'seri' && !a.seri) return false;
+    if (a.lvl && r.lvl !== a.lvl) return false;
+    if (a.dirf === 'up' && !(r.diff > 0)) return false;
+    if (a.dirf === 'down' && !(r.diff < 0)) return false;
+    if (q && r.id.toLowerCase().indexOf(q) < 0 && r.desc.toLowerCase().indexOf(q) < 0) return false;
+    return true;
+  });
+  var f = CMP[a.sort] || CMP.lvl, d = a.dir;
+  return rows.sort(function(x, y){ return f(x, y) * d; });
+}
+function setArrows(tableSel, st){
+  document.querySelectorAll(tableSel + ' thead th').forEach(function(th){
+    var b = th.querySelector('button'); if (!b) return;
+    var on = b.dataset.k === st.sort;
+    th.setAttribute('aria-sort', on ? (st.dir > 0 ? 'ascending' : 'descending') : 'none');
+    b.querySelector('.arr').textContent = on ? (st.dir > 0 ? '▲' : '▼') : '';
+  });
+}
+function renderAnom(){
+  var rows = getAnom(), slice = rows.slice(0, S.a.shown);
+  S.aRows = rows;
+  $('#aCount').textContent = fmt(rows.length) + ' resi';
+  $('#aBody').innerHTML = slice.length ? slice.map(function(r){
+    var d = r.status === 'seri' ? '—' : '<span class="' + (r.diff > 0 ? 'diff-up' : 'diff-down') + '">' + sgn(r.diff) + '</span>';
+    var base = r.status === 'seri' ? '—<span class="psub">tanpa mayoritas</span>' : kg(r.base) + '<span class="psub">' + r.baseC + ' dari ' + r.baseN + ' resi</span>';
+    return '<tr data-gi="' + r.gi + '" data-id="' + esc(r.id) + '" tabindex="0">' +
+      '<td><span class="chip ' + r.lvl + '">' + LVT[r.lvl] + '</span></td>' +
+      '<td class="mono">' + esc(r.id) + '</td>' +
+      '<td><div class="gdesc" title="' + esc(r.desc) + '">' + esc(r.desc) + '</div></td>' +
+      '<td class="num">' + r.qty + '</td>' +
+      '<td class="num"><b>' + kg(r.weight) + '</b></td>' +
+      '<td class="num">' + base + '</td>' +
+      '<td class="num">' + d + '</td></tr>';
+  }).join('') : '<tr><td colspan="7"><p class="empty">Tidak ada resi yang cocok dengan filter ini.</p></td></tr>';
+  $('#aMore').hidden = rows.length <= S.a.shown;
+  setArrows('#aTable', S.a);
+}
+
+/* ---------- tabel per kelompok ---------- */
+var STT = { anomali: 'Ada selisih', seri: 'Seri', konsisten: 'Konsisten', tunggal: 'Satu resi' };
+var STC = { anomali: 'tinggi', seri: 'seri', konsisten: 'konsisten', tunggal: 'sedikit' };
+var PCMP = {
+  desc: function(a, b){ return a.desc.localeCompare(b.desc); },
+  qty: function(a, b){ return a.qty - b.qty; },
+  n: function(a, b){ return a.n - b.n; },
+  share: function(a, b){ return a.mode.share - b.mode.share; },
+  nAnom: function(a, b){ return (a.nAnom + a.nSeri) - (b.nAnom + b.nSeri); },
+  excess: function(a, b){ return a.excess - b.excess; }
+};
+function getProd(){
+  var p = S.p, q = p.q.toLowerCase();
+  var gs = S.garr.filter(function(g){
+    if (p.only && !(g.nAnom || g.nSeri)) return false;
+    if (q && g.desc.toLowerCase().indexOf(q) < 0) return false;
+    return true;
+  });
+  var f = PCMP[p.sort] || PCMP.nAnom;
+  return gs.sort(function(a, b){ return f(a, b) * p.dir || b.n - a.n; });
+}
+function renderProd(){
+  var gs = getProd(), slice = gs.slice(0, S.p.shown);
+  $('#pCount').textContent = fmt(gs.length) + ' kelompok';
+  $('#pBody').innerHTML = slice.length ? slice.map(function(g){
+    var bad = g.status === 'seri' ? g.nSeri + ' (seri)' : (g.nAnom ? '<b>' + g.nAnom + '</b>' : '0');
+    return '<tr data-gi="' + g.i + '" tabindex="0">' +
+      '<td><div class="gdesc" title="' + esc(g.desc) + '">' + esc(g.desc) + '</div></td>' +
+      '<td class="num">' + g.qty + '</td>' +
+      '<td class="num">' + fmt(g.n) + '</td>' +
+      '<td>' + spectrum(g) + '</td>' +
+      '<td class="num">' + (g.status === 'seri' ? '—' : kg(g.mode.w) + ' kg<span class="psub">' + pct(g.mode.share) + '% resi</span>') + '</td>' +
+      '<td class="num">' + bad + '</td>' +
+      '<td class="num">' + (g.excess ? '<span class="diff-up">+' + kg(g.excess) + '</span>' : '0') + '</td>' +
+      '<td><span class="chip ' + STC[g.status] + '">' + STT[g.status] + '</span></td></tr>';
+  }).join('') : '<tr><td colspan="8"><p class="empty">Tidak ada kelompok yang cocok.</p></td></tr>';
+  $('#pMore').hidden = gs.length <= S.p.shown;
+  setArrows('#pTable', S.p);
+}
+
+/* ---------- detail kelompok ---------- */
+var lastFocus = null;
+function openDetail(gi, hlId){
+  var g = S.garr[gi]; if (!g) return;
+  var ws = Array.from(g.counts.keys()).sort(function(a, b){ return a - b; });
+  var m = g.mode;
+  var h = '<h2 class="long" id="mTitle">' + esc(g.desc) + '</h2><p class="sub">Quantity ' + g.qty + ', ' + fmt(g.n) + ' resi dengan Goods Description dan Quantity ini.</p>';
+
+  var others = ws.filter(function(w){ return w !== m.w; });
+  var txt, bad = false;
+  if (g.status === 'tunggal') txt = 'Hanya ada 1 resi, jadi belum ada pembanding.';
+  else if (g.status === 'konsisten') txt = 'Semua ' + g.n + ' resi berat ' + kg(m.w) + ' kg. Tidak ada selisih.';
+  else if (g.status === 'seri') { txt = 'Tidak ada berat mayoritas: ' + ws.map(function(w){ return kg(w) + ' kg (' + g.counts.get(w) + ' resi)'; }).join(' dan ') + '. Semua resi di kelompok ini ditandai seri.'; bad = true; }
+  else { txt = m.c + ' dari ' + g.n + ' resi (' + pct(m.share) + '%) berat ' + kg(m.w) + ' kg. Yang berbeda: ' + others.map(function(w){ return kg(w) + ' kg (' + g.counts.get(w) + ' resi)'; }).join(', ') + '.'; bad = true; }
+  h += '<p class="finding' + (bad ? ' bad' : '') + '">' + esc(txt) + '</p>';
+
+  h += '<h3>Sebaran berat</h3><div class="scroll"><table class="matrix" style="max-width:520px"><thead><tr><th>Berat</th><th>Jumlah resi</th><th>Porsi</th><th>Keterangan</th></tr></thead><tbody>' +
+    ws.map(function(w){
+      var c = g.counts.get(w), isBase = g.status === 'anomali' ? w === m.w : false;
+      var ket = g.status === 'anomali' ? (isBase ? 'Mayoritas' : 'Menyimpang (' + sgn(w - m.w) + ' kg)') : (g.status === 'seri' ? 'Seri' : (g.status === 'konsisten' ? 'Seragam' : '—'));
+      return '<tr style="cursor:default"><td>' + kg(w) + ' kg</td><td class="' + (isBase ? 'cell-base' : (g.status === 'anomali' || g.status === 'seri' ? 'cell-dev' : '')) + '">' + c + '</td><td>' + pct(c / g.n) + '%</td><td>' + ket + '</td></tr>';
+    }).join('') + '</tbody></table></div>';
+
+  var devW = g.status === 'anomali' ? others : (g.status === 'seri' ? ws : []);
+  if (devW.length){
+    h += '<h3>Tracking ID yang ditandai (' + (g.status === 'seri' ? g.nSeri : g.nAnom) + ')</h3>';
+    devW.forEach(function(w){
+      var ids = g.rows.filter(function(r){ return r.weight === w; }).map(function(r){ return r.id; });
+      h += '<div class="idhead"><span><b>' + kg(w) + ' kg</b> <span class="pill">' + ids.length + ' resi</span></span><button type="button" class="btn small" data-copy="' + esc(ids.join('\n')) + '">Salin ID</button></div><div class="ids">' +
+        ids.map(function(id){ return id === hlId ? '<mark>' + esc(id) + '</mark>' : esc(id); }).join(', ') + '</div>';
+    });
+  }
+
+  h += '<h3>Kemungkinan penyebab selisih</h3><ul class="causes"><li>Berat diinput atau ditimbang manual berbeda dari data master produk.</li><li>Pembulatan atau penimbangan ulang oleh kurir karena dimensi dus tidak sama.</li><li>Isi paket berbeda dari pesanan, misalnya bonus atau paket gabungan ikut dikirim.</li><li>Berat 0 kg biasanya berarti berat belum terisi di sistem.</li><li>Salah ketik saat input, misalnya 10 padahal maksudnya 1.</li></ul>';
+
+  $('#mBody').innerHTML = h;
+  lastFocus = document.activeElement;
+  $('#modal').hidden = false;
+  $('#mClose').focus();
+  var hl = document.querySelector('#mBody mark'); if (hl && hl.scrollIntoView) hl.scrollIntoView({ block: 'center' });
+}
+function closeModal(){ $('#modal').hidden = true; if (lastFocus && lastFocus.focus) lastFocus.focus(); }
+
+/* ---------- salin ---------- */
+function copyText(t){
+  return new Promise(function(res){
+    function fallback(){
+      try{ var ta = document.createElement('textarea'); ta.value = t; ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0'; document.body.appendChild(ta); ta.select(); var ok = document.execCommand('copy'); ta.remove(); res(ok); }catch(e){ res(false); }
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(function(){ res(true); }, fallback); else fallback();
+  });
+}
+function manualCopy(text){
+  $('#mBody').innerHTML = '<h2 id="mTitle">Salin manual</h2><p class="sub">Browser memblokir penyalinan otomatis. Pilih semua teks di bawah lalu salin.</p><textarea id="manual" style="width:100%;min-height:260px;font-family:var(--mono);font-size:12px;white-space:pre"></textarea>';
+  $('#manual').value = text; lastFocus = document.activeElement; $('#modal').hidden = false; $('#manual').focus(); $('#manual').select();
+}
+function copyAnom(){
+  var rows = S.aRows || [];
+  if (!rows.length){ toast('Tidak ada hasil untuk disalin.'); return; }
+  var head = ['Tingkat', 'Tracking ID', 'Goods Description', 'Quantity', 'Berat (kg)', 'Mayoritas (kg)', 'Selisih (kg)'].join('\t');
+  var body = rows.map(function(r){ return [LVT[r.lvl], r.id, r.desc.replace(/[\t\r\n]+/g, ' '), r.qty, r.weight, r.base == null ? '' : r.base, r.status === 'seri' ? '' : r.diff].join('\t'); }).join('\n');
+  var text = head + '\n' + body;
+  copyText(text).then(function(ok){ if (ok) toast(fmt(rows.length) + ' baris disalin. Tempel ke Excel atau Google Sheets.'); else manualCopy(text); });
+}
+
+/* ---------- event ---------- */
+function sortClick(st, rerender, defaults){
+  return function(e){
+    var b = e.target.closest('button[data-k]'); if (!b) return;
+    var k = b.dataset.k;
+    if (st.sort === k) st.dir = -st.dir; else { st.sort = k; st.dir = defaults[k] != null ? defaults[k] : 1; }
+    rerender();
+  };
+}
+function rowOpen(e){
+  var tr = e.target.closest('tbody tr[data-gi]'); if (!tr) return;
+  if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
+  if (e.type === 'keydown') e.preventDefault();
+  openDetail(+tr.dataset.gi, tr.dataset.id);
+}
+function debounce(f, ms){ var t; return function(){ clearTimeout(t); t = setTimeout(f, ms); }; }
+
+function init(){
+  loadRate();
+  $('#btnRun').addEventListener('click', function(){ readRate(); runText(); });
+  $('#btnClear').addEventListener('click', function(){ $('#input').value = ''; msg(''); $('#input').focus(); });
+  $('#btnSample').addEventListener('click', function(){ loadSample(); });
+  $('#fileLbl').addEventListener('keydown', function(e){ if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); $('#file').click(); } });
+  $('#file').addEventListener('change', function(e){
+    var f = e.target.files[0]; if (!f) return;
+    readRate(); msg('Membaca ' + f.name + '…');
+    if (/\.xlsx?$/i.test(f.name)){
+      if (!window.XLSX){ msg('Pustaka Excel gagal dimuat. Simpan file sebagai .csv atau tempel datanya langsung.', 'err'); return; }
+      f.arrayBuffer().then(function(buf){
+        var wb = XLSX.read(buf, { type: 'array' }), ws = wb.Sheets[wb.SheetNames[0]];
+        var cells = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' }).filter(function(r){ return r.some(function(c){ return String(c).trim(); }); }).map(function(r){ return r.map(function(c){ return String(c).trim(); }); });
+        handle(parseTable(cells), false);
+      }).catch(function(){ msg('File Excel tidak bisa dibaca.', 'err'); });
+    } else {
+      f.text().then(function(t){ $('#input').value = t.length < 1500000 ? t : ''; handle(parseTable(textToCells(t)), false); });
+    }
+    e.target.value = '';
+  });
+  var re = debounce(function(){ readRate(); if (S.rows.length) renderKPI(); }, 250);
+  $('#oRate').addEventListener('input', re);
+
+  $('#aQ').addEventListener('input', debounce(function(){ S.a.q = $('#aQ').value; S.a.shown = STEP; renderAnom(); }, 200));
+  $('#aLvl').addEventListener('change', function(){ S.a.lvl = this.value; S.a.shown = STEP; renderAnom(); });
+  $('#aDir').addEventListener('change', function(){ S.a.dirf = this.value; S.a.shown = STEP; renderAnom(); });
+  $('#aSeri').addEventListener('change', function(){ S.a.seri = this.checked; S.a.shown = STEP; renderAnom(); });
+  $('#aMore').addEventListener('click', function(){ S.a.shown += STEP; renderAnom(); });
+  $('#aCopy').addEventListener('click', copyAnom);
+  $('#aTable thead').addEventListener('click', sortClick(S.a, renderAnom, { diff: -1, weight: -1 }));
+  $('#aBody').addEventListener('click', rowOpen); $('#aBody').addEventListener('keydown', rowOpen);
+
+  $('#pQ').addEventListener('input', debounce(function(){ S.p.q = $('#pQ').value; S.p.shown = STEP; renderProd(); }, 200));
+  $('#pOnly').addEventListener('change', function(){ S.p.only = this.checked; S.p.shown = STEP; renderProd(); });
+  $('#pMore').addEventListener('click', function(){ S.p.shown += STEP; renderProd(); });
+  $('#pTable thead').addEventListener('click', sortClick(S.p, renderProd, { n: -1, share: 1, nAnom: -1, excess: -1 }));
+  $('#pBody').addEventListener('click', rowOpen); $('#pBody').addEventListener('keydown', rowOpen);
+  $('#topBars').addEventListener('click', function(e){ var b = e.target.closest('button[data-gi]'); if (b) openDetail(+b.dataset.gi); });
+
+  document.querySelectorAll('.tab').forEach(function(t){
+    t.addEventListener('click', function(){
+      document.querySelectorAll('.tab').forEach(function(x){ x.setAttribute('aria-selected', x === t ? 'true' : 'false'); });
+      ['p-anom', 'p-prod', 'p-how'].forEach(function(id){ $('#' + id).hidden = id !== t.getAttribute('aria-controls'); });
+    });
+  });
+  $('#mClose').addEventListener('click', closeModal);
+  $('#modal').addEventListener('click', function(e){
+    if (e.target === this) { closeModal(); return; }
+    var b = e.target.closest('button[data-copy]');
+    if (b){ var t = b.getAttribute('data-copy'); copyText(t).then(function(ok){ if (ok) toast('Tracking ID disalin.'); else manualCopy(t); }); }
+  });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !$('#modal').hidden) closeModal(); });
+
+}
+function loadSample(){
+  readRate();
+  var cells = [['TRACKING ID', 'Goods Description', 'Quantity', 'Weight']].concat(SAMPLE.map(function(r){ return [String(r[0]), String(r[1]), String(r[2]), String(r[3])]; }));
+  handle(parseTable(cells), true);
+  $('#dataPanel').open = true;
+}
+init();
+})();
+</script>
+</body>
+</html>
