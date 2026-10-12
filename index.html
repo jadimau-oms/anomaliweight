@@ -197,6 +197,13 @@ mark{background:var(--amber-bg);color:var(--ink);padding:0 3px;border-radius:3px
 .menu-list button b{display:block;font-size:14px;font-weight:600}
 .menu-list button span{display:block;font-size:12px;color:var(--muted);line-height:1.35;margin-top:1px}
 mark{background:var(--amber-bg);color:var(--ink);padding:0 3px;border-radius:3px;font-weight:600}
+.dropveil{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;background:rgba(14,133,119,.16);pointer-events:none;padding:20px}
+.dropveil[hidden]{display:none}
+.dropveil>div{border:3px dashed var(--teal);border-radius:14px;background:var(--surface);padding:34px 42px;text-align:center;max-width:90vw}
+.dropveil b{display:block;font-size:21px;margin-bottom:4px}
+.dropveil span{color:var(--muted);font-size:14px}
+.ids.tall{max-height:220px;overflow-y:auto}
+.idhead.ok b{color:var(--teal)}
 </style>
 </head>
 <body>
@@ -209,7 +216,7 @@ mark{background:var(--amber-bg);color:var(--ink);padding:0 3px;border-radius:3px
   <details class="panel" id="dataPanel" open>
     <summary><span>Data resi <span class="sum-sub" id="sumText"></span></span><span class="chev" aria-hidden="true"></span></summary>
     <div class="panel-body">
-      <textarea id="input" spellcheck="false" aria-label="Data resi" placeholder="Tempel data di sini, atau unggah file CSV/Excel di bawah.&#10;Kolom yang dibaca: TRACKING ID, Goods Description, Quantity, Weight (urutan bebas selama ada baris judul)"></textarea>
+      <textarea id="input" spellcheck="false" aria-label="Data resi" placeholder="Seret file CSV atau Excel ke mana saja di halaman ini, atau tempel datanya di sini.&#10;Kolom yang dibaca: TRACKING ID, Goods Description, Quantity, Weight (urutan bebas selama ada baris judul)"></textarea>
       <div class="actions">
         <button type="button" class="btn primary" id="btnRun">Analisis data</button>
         <label class="btn" for="file" tabindex="0" id="fileLbl">Unggah file (.csv, .xlsx, .txt)</label>
@@ -351,6 +358,7 @@ mark{background:var(--amber-bg);color:var(--ink);padding:0 3px;border-radius:3px
   </div>
 </div>
 <div class="toast" id="toast" hidden role="status"></div>
+<div class="dropveil" id="dropVeil" hidden aria-hidden="true"><div><b>Lepaskan file di sini</b><span>CSV, Excel (.xlsx), atau .txt akan langsung dianalisis</span></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
@@ -520,6 +528,7 @@ function handle(p, sample){
   var extra = [];
   if (p.skipped) extra.push(fmt(p.skipped) + ' baris dilewati karena tidak lengkap');
   if (p.dupes) extra.push(fmt(p.dupes) + ' Tracking ID muncul lebih dari sekali');
+  if (S.manyNote){ extra.push('hanya file pertama yang dibaca'); S.manyNote = false; }
   msg((sample ? 'Contoh dimuat: ' : 'Terbaca ') + fmt(p.rows.length) + ' baris' + (extra.length ? '. ' + extra.join('; ') : '.'), extra.length ? 'warn' : 'ok');
   $('#sumText').textContent = (sample ? '(contoh, ' : '(') + fmt(p.rows.length) + ' baris)';
   $('#sampleNote').hidden = !sample;
@@ -715,6 +724,14 @@ function openDetail(gi, hlId){
     });
   }
 
+  var okIds = [], okTitle = '', okPill = '';
+  if (g.status === 'anomali'){ okIds = g.rows.filter(function(r){ return r.weight === m.w; }).map(function(r){ return r.id; }); okTitle = 'Tracking ID tidak bermasalah'; okPill = kg(m.w) + ' kg, mayoritas'; }
+  else if (g.status === 'konsisten'){ okIds = g.rows.map(function(r){ return r.id; }); okTitle = 'Tracking ID tidak bermasalah'; okPill = kg(m.w) + ' kg, semua seragam'; }
+  else if (g.status === 'tunggal'){ okIds = g.rows.map(function(r){ return r.id; }); okTitle = 'Tracking ID'; okPill = 'belum ada pembanding'; }
+  if (okIds.length){
+    h += '<h3>' + okTitle + ' (' + fmt(okIds.length) + ')</h3><div class="idhead ok"><span><b>' + esc(okPill) + '</b> <span class="pill">' + fmt(okIds.length) + ' resi</span></span><button type="button" class="btn small" data-copy="' + esc(okIds.join('\n')) + '">Salin ID</button></div><div class="ids tall">' + okIds.map(esc).join(', ') + '</div>';
+  }
+
   h += '<h3>Kemungkinan penyebab selisih</h3><ul class="causes"><li>Berat diinput atau ditimbang manual berbeda dari data master produk.</li><li>Pembulatan atau penimbangan ulang oleh kurir karena dimensi dus tidak sama.</li><li>Isi paket berbeda dari pesanan, misalnya bonus atau paket gabungan ikut dikirim.</li><li>Berat 0 kg biasanya berarti berat belum terisi di sistem.</li><li>Salah ketik saat input, misalnya 10 padahal maksudnya 1.</li></ul>';
 
   $('#mBody').innerHTML = h;
@@ -838,6 +855,27 @@ function rowOpen(e){
 }
 function debounce(f, ms){ var t; return function(){ clearTimeout(t); t = setTimeout(f, ms); }; }
 
+function loadFile(f, many){
+  if (!f) return;
+  readRate();
+  if (!$('#modal').hidden) $('#modal').hidden = true;
+  if (!/\.(csv|tsv|txt|xlsx|xls)$/i.test(f.name)){
+    $('#dataPanel').open = true;
+    msg('Format file tidak didukung: ' + f.name + '. Gunakan .csv, .xlsx, atau .txt.', 'err'); return;
+  }
+  S.manyNote = !!many;
+  msg('Membaca ' + f.name + (many ? ' (hanya file pertama yang dibaca)' : '') + '…');
+  if (/\.xlsx?$/i.test(f.name)){
+    if (!window.XLSX){ $('#dataPanel').open = true; msg('Pustaka Excel gagal dimuat (perlu internet). Simpan file sebagai .csv atau tempel datanya langsung.', 'err'); return; }
+    f.arrayBuffer().then(function(buf){
+      var wb = XLSX.read(buf, { type: 'array' }), ws = wb.Sheets[wb.SheetNames[0]];
+      var cells = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' }).filter(function(r){ return r.some(function(c){ return String(c).trim(); }); }).map(function(r){ return r.map(function(c){ return String(c).trim(); }); });
+      handle(parseTable(cells), false);
+    }).catch(function(){ $('#dataPanel').open = true; msg('File Excel tidak bisa dibaca.', 'err'); });
+  } else {
+    f.text().then(function(t){ $('#input').value = t.length < 1500000 ? t : ''; handle(parseTable(textToCells(t)), false); });
+  }
+}
 function init(){
   loadRate();
   $('#btnRun').addEventListener('click', function(){ readRate(); runText(); });
@@ -845,19 +883,20 @@ function init(){
   $('#btnSample').addEventListener('click', function(){ loadSample(); });
   $('#fileLbl').addEventListener('keydown', function(e){ if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); $('#file').click(); } });
   $('#file').addEventListener('change', function(e){
-    var f = e.target.files[0]; if (!f) return;
-    readRate(); msg('Membaca ' + f.name + '…');
-    if (/\.xlsx?$/i.test(f.name)){
-      if (!window.XLSX){ msg('Pustaka Excel gagal dimuat. Simpan file sebagai .csv atau tempel datanya langsung.', 'err'); return; }
-      f.arrayBuffer().then(function(buf){
-        var wb = XLSX.read(buf, { type: 'array' }), ws = wb.Sheets[wb.SheetNames[0]];
-        var cells = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' }).filter(function(r){ return r.some(function(c){ return String(c).trim(); }); }).map(function(r){ return r.map(function(c){ return String(c).trim(); }); });
-        handle(parseTable(cells), false);
-      }).catch(function(){ msg('File Excel tidak bisa dibaca.', 'err'); });
-    } else {
-      f.text().then(function(t){ $('#input').value = t.length < 1500000 ? t : ''; handle(parseTable(textToCells(t)), false); });
-    }
-    e.target.value = '';
+    var f = e.target.files[0]; e.target.value = '';
+    loadFile(f);
+  });
+  /* seret dan lepas file ke mana saja di halaman */
+  var dragDepth = 0;
+  function hasFiles(e){ var t = e.dataTransfer && e.dataTransfer.types; return !!t && Array.prototype.indexOf.call(t, 'Files') >= 0; }
+  window.addEventListener('dragenter', function(e){ if (!hasFiles(e)) return; e.preventDefault(); dragDepth++; $('#dropVeil').hidden = false; });
+  window.addEventListener('dragover', function(e){ if (!hasFiles(e)) return; e.preventDefault(); try{ e.dataTransfer.dropEffect = 'copy'; }catch(x){} });
+  window.addEventListener('dragleave', function(e){ if (!hasFiles(e)) return; dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) $('#dropVeil').hidden = true; });
+  window.addEventListener('drop', function(e){
+    if (!hasFiles(e)) return;
+    e.preventDefault(); dragDepth = 0; $('#dropVeil').hidden = true;
+    var fs = e.dataTransfer.files; if (!fs || !fs.length) return;
+    loadFile(fs[0], fs.length > 1);
   });
   var re = debounce(function(){ readRate(); if (S.rows.length) renderKPI(); }, 250);
   $('#oRate').addEventListener('input', re);
