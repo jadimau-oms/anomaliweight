@@ -204,6 +204,37 @@ mark{background:var(--amber-bg);color:var(--ink);padding:0 3px;border-radius:3px
 .dropveil span{color:var(--muted);font-size:14px}
 .ids.tall{max-height:220px;overflow-y:auto}
 .idhead.ok b{color:var(--teal)}
+
+:root{--blue:#2F5FD0}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--blue:#7FA3FF}}
+:root[data-theme="dark"]{--blue:#7FA3FF}
+.kpis{grid-template-columns:repeat(4,minmax(0,1fr)) minmax(0,1.5fr)}
+.kpi-donut .donut-wrap{display:flex;align-items:center;gap:14px;margin-top:6px}
+.donut{width:96px;height:96px;flex:none}
+.slice{cursor:pointer;transition:opacity .15s}
+.slice:hover{opacity:.78}
+.slice.madam{stroke:var(--blue)}
+.slice.jasa{stroke:var(--amber)}
+.ring{stroke:var(--sunken)}
+.d-num{font:700 19px var(--sans);fill:var(--ink);text-anchor:middle;pointer-events:none}
+.d-lbl{font:500 8px var(--sans);fill:var(--muted);text-anchor:middle;pointer-events:none}
+.d-leg{display:flex;flex-direction:column;gap:2px;min-width:0}
+.d-item{display:flex;align-items:center;gap:8px;padding:5px 8px;margin:0 -8px;border:0;border-radius:6px;background:none;cursor:pointer;text-align:left;font-size:13px;flex-wrap:wrap}
+.d-item:hover{background:var(--sunken)}
+.d-item b{font-weight:700}
+.d-item .d-val{color:var(--muted);font-variant-numeric:tabular-nums}
+.sw{width:11px;height:11px;border-radius:3px;flex:none}
+.sw.madam{background:var(--blue)}
+.sw.jasa{background:var(--amber)}
+.d-hint{font-size:12px;color:var(--muted);margin-top:4px}
+.gtag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.02em;padding:1px 7px;border-radius:99px;border:1px solid currentColor}
+.gtag.madam{color:var(--blue)}
+.gtag.jasa{color:var(--amber-ink)}
+.backbtn{margin:0 0 10px -6px}
+.sheet-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0 12px}
+.chk-field{display:flex;gap:8px;align-items:flex-start;font-size:13px;font-weight:500;cursor:pointer}
+.chk-field input{margin-top:3px;width:auto}
+@media (max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
@@ -225,11 +256,20 @@ mark{background:var(--amber-bg);color:var(--ink);padding:0 3px;border-radius:3px
         <button type="button" class="btn ghost" id="btnClear">Kosongkan</button>
         <span class="msg" id="msg" role="status"></span>
       </div>
-      <div class="settings one">
+      <div class="settings">
+        <div class="field">
+          <label for="oCodes">Kode grup MADAM</label>
+          <input type="text" id="oCodes" value="NFZ, RZZ, IDX, MBY, IDR, IPD, MBI, RCC, IHY, AFF, IZZ" spellcheck="false" autocomplete="off">
+          <small>Goods Description yang mengandung salah satu kode ini masuk MADAM, sisanya JASA. Huruf besar dan kecil dibedakan.</small>
+        </div>
+        <div class="field">
+          <label class="chk-field" for="oWord"><input type="checkbox" id="oWord" checked><span>Kode tidak boleh menempel di belakang huruf</span></label>
+          <small>Mencegah salah cocok, misalnya kode MBI pada kata SAMBIL atau KOMBI. Matikan untuk mencocokkan di mana saja.</small>
+        </div>
         <div class="field">
           <label for="oRate">Tarif per kg (Rp, opsional)</label>
           <input type="number" id="oRate" min="0" step="500" value="0">
-          <small>Dipakai untuk menghitung perkiraan kelebihan biaya dari resi yang lebih berat.</small>
+          <small>Dipakai untuk menampilkan perkiraan biaya pada kartu Kelebihan berat dan di file ekspor.</small>
         </div>
       </div>
       <p class="privacy">Data diproses di browser Anda dan tidak dikirim ke server mana pun.</p>
@@ -275,6 +315,11 @@ mark{background:var(--amber-bg);color:var(--ink);padding:0 3px;border-radius:3px
           <option value="up">Hanya lebih berat</option>
           <option value="down">Hanya lebih ringan</option>
         </select>
+        <select id="aGrp" aria-label="Grup">
+          <option value="">Semua grup</option>
+          <option value="MADAM">MADAM</option>
+          <option value="JASA">JASA</option>
+        </select>
         <label class="chk"><input type="checkbox" id="aSeri" checked> Sertakan kelompok seri</label>
         <span class="spacer"></span>
         <span class="count" id="aCount"></span>
@@ -293,6 +338,7 @@ mark{background:var(--amber-bg);color:var(--ink);padding:0 3px;border-radius:3px
         <thead><tr>
           <th><button type="button" data-k="lvl">Tingkat <span class="arr"></span></button></th>
           <th><button type="button" data-k="id">Tracking ID <span class="arr"></span></button></th>
+          <th><button type="button" data-k="grp">Grup <span class="arr"></span></button></th>
           <th><button type="button" data-k="desc">Goods Description <span class="arr"></span></button></th>
           <th class="num"><button type="button" data-k="qty">Qty <span class="arr"></span></button></th>
           <th class="num"><button type="button" data-k="weight">Berat (kg) <span class="arr"></span></button></th>
@@ -307,6 +353,11 @@ mark{background:var(--amber-bg);color:var(--ink);padding:0 3px;border-radius:3px
     <div class="tabpanel" id="p-prod" role="tabpanel" aria-labelledby="t-prod" hidden>
       <div class="toolbar">
         <input type="search" id="pQ" placeholder="Cari Goods Description" aria-label="Cari Goods Description">
+        <select id="pGrp" aria-label="Grup">
+          <option value="">Semua grup</option>
+          <option value="MADAM">MADAM</option>
+          <option value="JASA">JASA</option>
+        </select>
         <label class="chk"><input type="checkbox" id="pOnly" checked> Hanya yang bermasalah</label>
         <span class="spacer"></span>
         <span class="count" id="pCount"></span>
@@ -323,6 +374,7 @@ mark{background:var(--amber-bg);color:var(--ink);padding:0 3px;border-radius:3px
       <div class="scroll"><table id="pTable">
         <thead><tr>
           <th><button type="button" data-k="desc">Goods Description <span class="arr"></span></button></th>
+          <th><button type="button" data-k="grp">Grup <span class="arr"></span></button></th>
           <th class="num"><button type="button" data-k="qty">Qty <span class="arr"></span></button></th>
           <th class="num"><button type="button" data-k="n">Jumlah resi <span class="arr"></span></button></th>
           <th>Sebaran berat (kg)</th>
@@ -494,15 +546,26 @@ function analyze(rows){
   return { groups: groups, rows: rows, kpi: kpi };
 }
 
-var SAMPLE=[["DEMO-A-001","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-002","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-003","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-004","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-005","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-006","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-007","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-008","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-009","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-010","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-011","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-012","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-013","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-014","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-015","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-016","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-017","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-018","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-019","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-020","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-021","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-022","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-023","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-024","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-025","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-026","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-027","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-028","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-029","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-030","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-031","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-032","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-033","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-034","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-035","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-036","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-037","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-038","Produk Contoh A | KODE-1 Varian: Merah",1,1],["DEMO-A-039","Produk Contoh A | KODE-1 Varian: Merah",1,2],["DEMO-A-040","Produk Contoh A | KODE-1 Varian: Merah",1,2],["DEMO-B-001","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-002","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-003","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-004","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-005","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-006","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-007","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-008","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-009","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-010","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-011","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-012","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-013","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-014","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-015","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-016","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-017","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-018","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-019","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-020","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-021","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-022","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-023","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-024","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-025","Produk Contoh B | KODE-2 Paket isi 2",2,1],["DEMO-B-026","Produk Contoh B | KODE-2 Paket isi 2",2,0],["DEMO-C-001","Produk Contoh C | KODE-3 Varian: Biru",1,1],["DEMO-C-002","Produk Contoh C | KODE-3 Varian: Biru",1,2],["DEMO-D-001","Produk Contoh D | KODE-4 Ukuran: L",1,1],["DEMO-D-002","Produk Contoh D | KODE-4 Ukuran: L",1,1],["DEMO-D-003","Produk Contoh D | KODE-4 Ukuran: L",1,1],["DEMO-D-004","Produk Contoh D | KODE-4 Ukuran: L",1,1],["DEMO-D-005","Produk Contoh D | KODE-4 Ukuran: L",1,1],["DEMO-D-006","Produk Contoh D | KODE-4 Ukuran: L",1,1],["DEMO-D-007","Produk Contoh D | KODE-4 Ukuran: L",1,1],["DEMO-D-008","Produk Contoh D | KODE-4 Ukuran: L",1,1],["DEMO-D-009","Produk Contoh D | KODE-4 Ukuran: L",1,1],["DEMO-D-010","Produk Contoh D | KODE-4 Ukuran: L",1,1],["DEMO-D-011","Produk Contoh D | KODE-4 Ukuran: L",1,1],["DEMO-D-012","Produk Contoh D | KODE-4 Ukuran: L",1,1],["DEMO-D-013","Produk Contoh D | KODE-4 Ukuran: L",1,1],["DEMO-D-014","Produk Contoh D | KODE-4 Ukuran: L",1,1],["DEMO-D-015","Produk Contoh D | KODE-4 Ukuran: L",1,1],["DEMO-D-016","Produk Contoh D | KODE-4 Ukuran: L",1,4],["DEMO-E-001","Produk Contoh E | KODE-5 Varian: Hijau",1,1],["DEMO-E-002","Produk Contoh E | KODE-5 Varian: Hijau",1,1],["DEMO-E-003","Produk Contoh E | KODE-5 Varian: Hijau",1,1],["DEMO-E-004","Produk Contoh E | KODE-5 Varian: Hijau",1,1],["DEMO-E-005","Produk Contoh E | KODE-5 Varian: Hijau",1,1],["DEMO-E-006","Produk Contoh E | KODE-5 Varian: Hijau",1,1],["DEMO-E-007","Produk Contoh E | KODE-5 Varian: Hijau",1,1],["DEMO-E-008","Produk Contoh E | KODE-5 Varian: Hijau",1,1],["DEMO-E-009","Produk Contoh E | KODE-5 Varian: Hijau",1,1],["DEMO-E-010","Produk Contoh E | KODE-5 Varian: Hijau",1,1],["DEMO-E-011","Produk Contoh E | KODE-5 Varian: Hijau",1,1],["DEMO-E-012","Produk Contoh E | KODE-5 Varian: Hijau",1,1]];
+/* ---------- grup MADAM / JASA ---------- */
+var DEFAULT_CODES = 'NFZ, RZZ, IDX, MBY, IDR, IPD, MBI, RCC, IHY, AFF, IZZ';
+function escRe(s){ return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+function parseCodes(s){ return String(s || '').split(/[\s,;]+/).map(function(x){ return x.trim(); }).filter(Boolean); }
+/* wordRule=true: kode tidak boleh menempel di belakang huruf (mis. MBI di SAMBIL / KOMBI) */
+function makeClassifier(codes, wordRule){
+  if (!codes.length) return function(){ return 'JASA'; };
+  var re = new RegExp((wordRule ? '(?:^|[^A-Za-z])' : '') + '(?:' + codes.map(escRe).join('|') + ')');
+  return function(desc){ return re.test(desc) ? 'MADAM' : 'JASA'; };
+}
+
+var SAMPLE=[["DEMO-A-001","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-002","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-003","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-004","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-005","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-006","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-007","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-008","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-009","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-010","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-011","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-012","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-013","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-014","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-015","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-016","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-017","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-018","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-019","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-020","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-021","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-022","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-023","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-024","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-025","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-026","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-027","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-028","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-029","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-030","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-031","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-032","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-033","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-034","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-035","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-036","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-037","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-038","Produk Contoh A | S-NFZ Varian: Merah",1,1],["DEMO-A-039","Produk Contoh A | S-NFZ Varian: Merah",1,2],["DEMO-A-040","Produk Contoh A | S-NFZ Varian: Merah",1,2],["DEMO-B-001","Produk Contoh B | RZZ Paket isi 2",2,1],["DEMO-B-002","Produk Contoh B | RZZ Paket isi 2",2,1],["DEMO-B-003","Produk Contoh B | RZZ Paket isi 2",2,1],["DEMO-B-004","Produk Contoh B | RZZ Paket isi 2",2,1],["DEMO-B-005","Produk Contoh B | RZZ Paket isi 2",2,1],["DEMO-B-006","Produk Contoh B | RZZ Paket isi 2",2,1],["DEMO-B-007","Produk Contoh B | RZZ Paket isi 2",2,1],["DEMO-B-008","Produk Contoh B | RZZ Paket isi 2",2,1],["DEMO-B-009","Produk Contoh B | RZZ Paket isi 2",2,1],["DEMO-B-010","Produk Contoh B | RZZ Paket isi 2",2,1],["DEMO-B-011","Produk Contoh B | RZZ Paket isi 2",2,1],["DEMO-B-012","Produk Contoh B | RZZ Paket isi 2",2,1],["DEMO-B-013","Produk Contoh B | RZZ Paket isi 2",2,1],["DEMO-B-014","Produk Contoh B | RZZ Paket isi 2",2,1],["DEMO-B-015","Produk Contoh B | RZZ Paket isi 2",2,1],["DEMO-B-016","Produk Contoh B | RZZ Paket isi 2",2,1],["DEMO-B-017","Produk Contoh B | RZZ Paket isi 2",2,1],["DEMO-B-018","Produk Contoh B | RZZ Paket isi 2",2,1],["DEMO-B-019","Produk Contoh B | RZZ Paket isi 2",2,1],["DEMO-B-020","Produk Contoh B | RZZ Paket isi 2",2,1],["DEMO-B-021","Produk Contoh B | RZZ Paket isi 2",2,1],["DEMO-B-022","Produk Contoh B | RZZ Paket isi 2",2,1],["DEMO-B-023","Produk Contoh B | RZZ Paket isi 2",2,1],["DEMO-B-024","Produk Contoh B | RZZ Paket isi 2",2,1],["DEMO-B-025","Produk Contoh B | RZZ Paket isi 2",2,1],["DEMO-B-026","Produk Contoh B | RZZ Paket isi 2",2,0],["DEMO-C-001","Produk Contoh C Varian: Biru",1,1],["DEMO-C-002","Produk Contoh C Varian: Biru",1,2],["DEMO-D-001","Produk Contoh D Ukuran: L",1,1],["DEMO-D-002","Produk Contoh D Ukuran: L",1,1],["DEMO-D-003","Produk Contoh D Ukuran: L",1,1],["DEMO-D-004","Produk Contoh D Ukuran: L",1,1],["DEMO-D-005","Produk Contoh D Ukuran: L",1,1],["DEMO-D-006","Produk Contoh D Ukuran: L",1,1],["DEMO-D-007","Produk Contoh D Ukuran: L",1,1],["DEMO-D-008","Produk Contoh D Ukuran: L",1,1],["DEMO-D-009","Produk Contoh D Ukuran: L",1,1],["DEMO-D-010","Produk Contoh D Ukuran: L",1,1],["DEMO-D-011","Produk Contoh D Ukuran: L",1,1],["DEMO-D-012","Produk Contoh D Ukuran: L",1,1],["DEMO-D-013","Produk Contoh D Ukuran: L",1,1],["DEMO-D-014","Produk Contoh D Ukuran: L",1,1],["DEMO-D-015","Produk Contoh D Ukuran: L",1,1],["DEMO-D-016","Produk Contoh D Ukuran: L",1,4],["DEMO-E-001","Produk Contoh E Varian: Hijau",1,1],["DEMO-E-002","Produk Contoh E Varian: Hijau",1,1],["DEMO-E-003","Produk Contoh E Varian: Hijau",1,1],["DEMO-E-004","Produk Contoh E Varian: Hijau",1,1],["DEMO-E-005","Produk Contoh E Varian: Hijau",1,1],["DEMO-E-006","Produk Contoh E Varian: Hijau",1,1],["DEMO-E-007","Produk Contoh E Varian: Hijau",1,1],["DEMO-E-008","Produk Contoh E Varian: Hijau",1,1],["DEMO-E-009","Produk Contoh E Varian: Hijau",1,1],["DEMO-E-010","Produk Contoh E Varian: Hijau",1,1],["DEMO-E-011","Produk Contoh E Varian: Hijau",1,1],["DEMO-E-012","Produk Contoh E Varian: Hijau",1,1]];
 
 (function(){
 'use strict';
 var $ = function(s){ return document.querySelector(s); };
 var S = {
-  rows: [], skipped: 0, dupes: 0, result: null, isSample: false, rate: 0,
-  a: { sort: 'lvl', dir: 1, shown: 150, q: '', lvl: '', dirf: '', seri: true },
-  p: { sort: 'nAnom', dir: -1, shown: 150, q: '', only: true }
+  rows: [], skipped: 0, dupes: 0, result: null, isSample: false, rate: 0, codes: DEFAULT_CODES, word: true, grp: null, moved: 0, listCode: null,
+  a: { sort: 'lvl', dir: 1, shown: 150, q: '', lvl: '', dirf: '', seri: true, grp: '' },
+  p: { sort: 'nAnom', dir: -1, shown: 150, q: '', only: true, grp: '' }
 };
 var STEP = 150;
 
@@ -513,8 +576,22 @@ function pct(x){ return Math.round(x * 100); }
 function rp(n){ return 'Rp ' + Math.round(n).toLocaleString('id-ID'); }
 function sgn(n){ return (n > 0 ? '+' : '') + kg(n); }
 
-function loadRate(){ try{ var v = parseFloat(localStorage.getItem('pbt2.rate')); if (isFinite(v) && v >= 0) S.rate = v; }catch(e){} $('#oRate').value = S.rate; }
-function readRate(){ var v = parseFloat($('#oRate').value); S.rate = isFinite(v) && v >= 0 ? v : 0; try{ localStorage.setItem('pbt2.rate', String(S.rate)); }catch(e){} }
+function loadRate(){
+  try{
+    var v = parseFloat(localStorage.getItem('pbt2.rate')); if (isFinite(v) && v >= 0) S.rate = v;
+    var c = localStorage.getItem('pbt2.codes'); if (c !== null && c.trim()) S.codes = c;
+    var w = localStorage.getItem('pbt2.word'); if (w !== null) S.word = w === '1';
+  }catch(e){}
+  $('#oRate').value = S.rate; $('#oCodes').value = S.codes; $('#oWord').checked = S.word;
+}
+function readRate(){
+  var v = parseFloat($('#oRate').value); S.rate = isFinite(v) && v >= 0 ? v : 0;
+  var c = $('#oCodes').value.trim() ? $('#oCodes').value : DEFAULT_CODES, w = $('#oWord').checked;
+  var changed = c !== S.codes || w !== S.word;
+  S.codes = c; S.word = w;
+  try{ localStorage.setItem('pbt2.rate', String(S.rate)); localStorage.setItem('pbt2.codes', S.codes); localStorage.setItem('pbt2.word', S.word ? '1' : '0'); }catch(e){}
+  return changed;
+}
 
 function msg(t, cls){ var m = $('#msg'); m.textContent = t || ''; m.className = 'msg' + (cls ? ' ' + cls : ''); }
 var toastT;
@@ -544,9 +621,42 @@ function recompute(){
   var i = 0; S.garr = [];
   S.result.groups.forEach(function(g){ g.i = i++; S.garr.push(g); });
   S.result.rows.forEach(function(r){ r.gi = S.result.groups.get(r.gk).i; });
+  classifyAll();
   S.a.shown = STEP; S.p.shown = STEP;
   $('#results').hidden = false;
   renderKPI(); renderOverview(); renderAnom(); renderProd();
+}
+
+/* ---------- grup MADAM / JASA ---------- */
+function classifyAll(){
+  var codes = parseCodes(S.codes), cls = makeClassifier(codes, S.word), lit = makeClassifier(codes, false);
+  var mk = function(){ return { rows: 0, groups: 0, anomGroups: 0, anom: 0, heavy: 0, light: 0, excess: 0, seri: 0 }; };
+  S.codeList = codes; S.grp = { MADAM: mk(), JASA: mk() }; S.moved = 0;
+  S.garr.forEach(function(g){
+    g.grp = cls(g.desc);
+    var st = S.grp[g.grp];
+    st.rows += g.n; st.groups++; if (g.nAnom) st.anomGroups++; st.anom += g.nAnom; st.excess += g.excess; st.seri += g.nSeri;
+    if (g.grp === 'JASA' && lit(g.desc) === 'MADAM') S.moved += g.n;
+  });
+  S.result.rows.forEach(function(r){
+    r.grp = S.garr[r.gi].grp;
+    if (r.status === 'anomali'){ if (r.diff > 0) S.grp[r.grp].heavy++; else S.grp[r.grp].light++; }
+  });
+}
+function donutHTML(){
+  var M = S.grp.MADAM.anom, J = S.grp.JASA.anom, tot = M + J, C = 2 * Math.PI * 36, gap = (M > 0 && J > 0) ? 2.5 : 0;
+  var seg = function(val, off, code){
+    if (!val) return '';
+    var len = Math.max(1, val / tot * C - gap);
+    return '<circle class="slice ' + code.toLowerCase() + '" data-grp="' + code + '" cx="50" cy="50" r="36" fill="none" stroke-width="17" stroke-dasharray="' + len.toFixed(2) + ' ' + (C - len).toFixed(2) + '" stroke-dashoffset="' + (-off).toFixed(2) + '" transform="rotate(-90 50 50)"><title>' + code + ': ' + val + ' resi tidak wajar</title></circle>';
+  };
+  var svg = '<svg class="donut" viewBox="0 0 100 100" role="img" aria-label="Resi tidak wajar per grup: MADAM ' + M + ', JASA ' + J + '">' +
+    (tot ? seg(M, 0, 'MADAM') + seg(J, M / tot * C, 'JASA') : '<circle class="ring" cx="50" cy="50" r="36" fill="none" stroke-width="17"></circle>') +
+    '<text class="d-num" x="50" y="52">' + fmt(tot) + '</text><text class="d-lbl" x="50" y="63">resi</text></svg>';
+  var item = function(code, val){
+    return '<button type="button" class="d-item" data-grp="' + code + '"><i class="sw ' + code.toLowerCase() + '"></i><b>' + code + '</b><span class="d-val">' + fmt(val) + ' resi' + (tot ? ' (' + pct(val / tot) + '%)' : '') + '</span></button>';
+  };
+  return '<div class="donut-wrap">' + svg + '<div class="d-leg">' + item('MADAM', M) + item('JASA', J) + '<p class="d-hint">Klik untuk melihat Tracking ID</p></div></div>';
 }
 
 /* ---------- KPI ---------- */
@@ -556,12 +666,13 @@ function renderKPI(){
     { l: 'Resi dianalisis', v: fmt(k.total), s: fmt(k.groups) + ' kelompok' + (S.dupes ? ', ' + fmt(S.dupes) + ' ID ganda' : '') },
     { l: 'Resi tidak wajar', v: fmt(k.anom), s: fmt(k.heavy) + ' lebih berat, ' + fmt(k.light) + ' lebih ringan', hot: k.anom > 0 },
     { l: 'Kelompok bermasalah', v: fmt(k.anomGroups), s: 'dari ' + fmt(k.compGroups) + ' kelompok yang bisa dibandingkan', hot: k.anomGroups > 0 },
-    { l: 'Kelebihan berat', v: fmt(Math.round(k.excess * 10) / 10) + ' kg', s: 'total selisih resi yang lebih berat' },
-    { l: 'Perkiraan kelebihan biaya', v: rate > 0 ? rp(k.excess * rate) : 'Belum dihitung', s: rate > 0 ? 'selisih kg dikali ' + rp(rate) + ' per kg' : 'isi tarif per kg di pengaturan' }
+    { l: 'Kelebihan berat', v: fmt(Math.round(k.excess * 10) / 10) + ' kg', s: rate > 0 ? 'perkiraan biaya ' + rp(k.excess * rate) : 'total selisih resi yang lebih berat' }
   ];
-  $('#kpis').innerHTML = cells.map(function(c){ return '<div class="kpi' + (c.hot ? ' hot' : '') + '"><div class="k-l">' + c.l + '</div><div class="k-v">' + c.v + '</div><div class="k-s">' + c.s + '</div></div>'; }).join('');
+  $('#kpis').innerHTML = cells.map(function(c){ return '<div class="kpi' + (c.hot ? ' hot' : '') + '"><div class="k-l">' + c.l + '</div><div class="k-v">' + c.v + '</div><div class="k-s">' + c.s + '</div></div>'; }).join('') +
+    '<div class="kpi kpi-donut"><div class="k-l">Resi tidak wajar per grup</div>' + donutHTML() + '</div>';
   var ex = [];
   if (k.tieRows) ex.push(fmt(k.tieRows) + ' resi di ' + fmt(k.tieGroups) + ' kelompok seri (tanpa berat mayoritas) ditandai terpisah dan tidak masuk hitungan di atas');
+  if (S.word && S.moved) ex.push(fmt(S.moved) + ' resi punya kode yang menempel di tengah kata (misalnya MBI pada SAMBIL), jadi dihitung JASA');
   if (k.singles) ex.push(fmt(k.singles) + ' resi punya Goods Description dan Quantity yang unik, jadi belum ada pembanding');
   $('#kpiExtra').textContent = ex.length ? 'Catatan: ' + ex.join('; ') + '.' : '';
 }
@@ -603,6 +714,7 @@ var LVT = { tinggi: 'Tinggi', sedang: 'Sedang', rendah: 'Rendah', seri: 'Seri' }
 var CMP = {
   lvl: function(a, b){ return LVO[a.lvl] - LVO[b.lvl] || b.diff - a.diff || a.desc.localeCompare(b.desc); },
   id: function(a, b){ return a.id.localeCompare(b.id); },
+  grp: function(a, b){ return a.grp.localeCompare(b.grp) || LVO[a.lvl] - LVO[b.lvl]; },
   desc: function(a, b){ return a.desc.localeCompare(b.desc) || a.qty - b.qty; },
   qty: function(a, b){ return a.qty - b.qty; },
   weight: function(a, b){ return a.weight - b.weight; },
@@ -617,6 +729,7 @@ function getAnom(){
     if (a.lvl && r.lvl !== a.lvl) return false;
     if (a.dirf === 'up' && !(r.diff > 0)) return false;
     if (a.dirf === 'down' && !(r.diff < 0)) return false;
+    if (a.grp && r.grp !== a.grp) return false;
     if (q && r.id.toLowerCase().indexOf(q) < 0 && r.desc.toLowerCase().indexOf(q) < 0) return false;
     return true;
   });
@@ -641,12 +754,13 @@ function renderAnom(){
     return '<tr data-gi="' + r.gi + '" data-id="' + esc(r.id) + '" tabindex="0">' +
       '<td><span class="chip ' + r.lvl + '">' + LVT[r.lvl] + '</span></td>' +
       '<td class="mono">' + esc(r.id) + '</td>' +
+      '<td><span class="gtag ' + r.grp.toLowerCase() + '">' + r.grp + '</span></td>' +
       '<td><div class="gdesc" title="' + esc(r.desc) + '">' + esc(r.desc) + '</div></td>' +
       '<td class="num">' + r.qty + '</td>' +
       '<td class="num"><b>' + kg(r.weight) + '</b></td>' +
       '<td class="num">' + base + '</td>' +
       '<td class="num">' + d + '</td></tr>';
-  }).join('') : '<tr><td colspan="7"><p class="empty">Tidak ada resi yang cocok dengan filter ini.</p></td></tr>';
+  }).join('') : '<tr><td colspan="8"><p class="empty">Tidak ada resi yang cocok dengan filter ini.</p></td></tr>';
   $('#aMore').hidden = rows.length <= S.a.shown;
   setArrows('#aTable', S.a);
 }
@@ -656,6 +770,7 @@ var STT = { anomali: 'Ada selisih', seri: 'Seri', konsisten: 'Konsisten', tungga
 var STC = { anomali: 'tinggi', seri: 'seri', konsisten: 'konsisten', tunggal: 'sedikit' };
 var PCMP = {
   desc: function(a, b){ return a.desc.localeCompare(b.desc); },
+  grp: function(a, b){ return a.grp.localeCompare(b.grp); },
   qty: function(a, b){ return a.qty - b.qty; },
   n: function(a, b){ return a.n - b.n; },
   share: function(a, b){ return a.mode.share - b.mode.share; },
@@ -666,6 +781,7 @@ function getProd(){
   var p = S.p, q = p.q.toLowerCase();
   var gs = S.garr.filter(function(g){
     if (p.only && !(g.nAnom || g.nSeri)) return false;
+    if (p.grp && g.grp !== p.grp) return false;
     if (q && g.desc.toLowerCase().indexOf(q) < 0) return false;
     return true;
   });
@@ -679,6 +795,7 @@ function renderProd(){
     var bad = g.status === 'seri' ? g.nSeri + ' (seri)' : (g.nAnom ? '<b>' + g.nAnom + '</b>' : '0');
     return '<tr data-gi="' + g.i + '" tabindex="0">' +
       '<td><div class="gdesc" title="' + esc(g.desc) + '">' + esc(g.desc) + '</div></td>' +
+      '<td><span class="gtag ' + g.grp.toLowerCase() + '">' + g.grp + '</span></td>' +
       '<td class="num">' + g.qty + '</td>' +
       '<td class="num">' + fmt(g.n) + '</td>' +
       '<td>' + spectrum(g) + '</td>' +
@@ -686,18 +803,18 @@ function renderProd(){
       '<td class="num">' + bad + '</td>' +
       '<td class="num">' + (g.excess ? '<span class="diff-up">+' + kg(g.excess) + '</span>' : '0') + '</td>' +
       '<td><span class="chip ' + STC[g.status] + '">' + STT[g.status] + '</span></td></tr>';
-  }).join('') : '<tr><td colspan="8"><p class="empty">Tidak ada kelompok yang cocok.</p></td></tr>';
+  }).join('') : '<tr><td colspan="9"><p class="empty">Tidak ada kelompok yang cocok.</p></td></tr>';
   $('#pMore').hidden = gs.length <= S.p.shown;
   setArrows('#pTable', S.p);
 }
 
 /* ---------- detail kelompok ---------- */
 var lastFocus = null;
-function openDetail(gi, hlId){
+function openDetail(gi, hlId, back){
   var g = S.garr[gi]; if (!g) return;
   var ws = Array.from(g.counts.keys()).sort(function(a, b){ return a - b; });
   var m = g.mode;
-  var h = '<h2 class="long" id="mTitle">' + esc(g.desc) + '</h2><p class="sub">Quantity ' + g.qty + ', ' + fmt(g.n) + ' resi dengan Goods Description dan Quantity ini.</p>';
+  var h = (back ? '<button type="button" class="btn small ghost backbtn" data-back="' + esc(back) + '">← Kembali ke daftar ' + esc(back) + '</button>' : '') + '<h2 class="long" id="mTitle">' + esc(g.desc) + '</h2><p class="sub">Quantity ' + g.qty + ', ' + fmt(g.n) + ' resi dengan Goods Description dan Quantity ini.</p>';
 
   var others = ws.filter(function(w){ return w !== m.w; });
   var txt, bad = false;
@@ -735,12 +852,41 @@ function openDetail(gi, hlId){
   h += '<h3>Kemungkinan penyebab selisih</h3><ul class="causes"><li>Berat diinput atau ditimbang manual berbeda dari data master produk.</li><li>Pembulatan atau penimbangan ulang oleh kurir karena dimensi dus tidak sama.</li><li>Isi paket berbeda dari pesanan, misalnya bonus atau paket gabungan ikut dikirim.</li><li>Berat 0 kg biasanya berarti berat belum terisi di sistem.</li><li>Salah ketik saat input, misalnya 10 padahal maksudnya 1.</li></ul>';
 
   $('#mBody').innerHTML = h;
-  lastFocus = document.activeElement;
-  $('#modal').hidden = false;
+  if ($('#modal').hidden){ lastFocus = document.activeElement; $('#modal').hidden = false; }
   $('#mClose').focus();
+  var sh0 = document.querySelector('#modal .sheet'); if (sh0) sh0.scrollTop = 0;
   var hl = document.querySelector('#mBody mark'); if (hl && hl.scrollIntoView) hl.scrollIntoView({ block: 'center' });
 }
 function closeModal(){ $('#modal').hidden = true; if (lastFocus && lastFocus.focus) lastFocus.focus(); }
+
+/* ---------- daftar resi tidak wajar per grup ---------- */
+function grpRows(code){ return S.result.rows.filter(function(r){ return r.grp === code && r.status === 'anomali'; }).sort(CMP.lvl); }
+function openGroupList(code){
+  var rows = grpRows(code), seri = S.result.rows.filter(function(r){ return r.grp === code && r.status === 'seri'; }), st = S.grp[code];
+  S.listCode = code;
+  var rule = code === 'MADAM' ? 'Goods Description yang mengandung kode ' + esc(S.codeList.join(', ')) + (S.word ? ' (tidak menempel di belakang huruf)' : '') : 'Goods Description yang tidak mengandung kode MADAM';
+  var h = '<h2 id="mTitle">Resi tidak wajar: <span class="gtag ' + code.toLowerCase() + '" style="font-size:15px;vertical-align:2px">' + code + '</span></h2><p class="sub">' + rule + '.</p>';
+  if (!rows.length) h += '<p class="finding">Tidak ada resi tidak wajar di grup ' + code + '.</p>';
+  else {
+    h += '<p class="finding bad">' + fmt(rows.length) + ' resi di ' + fmt(st.anomGroups) + ' kelompok. ' + fmt(st.heavy) + ' lebih berat, ' + fmt(st.light) + ' lebih ringan, kelebihan ' + kg(Math.round(st.excess * 10) / 10) + ' kg' + (S.rate > 0 ? ' (perkiraan ' + rp(st.excess * S.rate) + ')' : '') + '.</p>';
+    h += '<div class="sheet-actions"><button type="button" class="btn small" data-copy="' + esc(rows.map(function(r){ return r.id; }).join('\n')) + '">Salin semua Tracking ID</button>' +
+      '<details class="menu" id="gMenu"><summary class="btn small primary" aria-label="Ekspor grup ' + code + '">Ekspor</summary><div class="menu-list" role="menu"><p class="menu-note">Resi tidak wajar grup ' + code + '</p>' +
+      '<button type="button" role="menuitem" data-scope="grp:' + code + '" data-kind="xlsx"><b>Excel (.xlsx)</b><span>Disarankan: Tracking ID tetap utuh, ditambah sheet kelompok</span></button>' +
+      '<button type="button" role="menuitem" data-scope="grp:' + code + '" data-kind="csv;"><b>CSV, pemisah titik koma</b><span>Untuk Excel versi Indonesia</span></button>' +
+      '<button type="button" role="menuitem" data-scope="grp:' + code + '" data-kind="csv,"><b>CSV, pemisah koma</b><span>Untuk Google Sheets dan aplikasi lain</span></button></div></details>' +
+      '<span class="count">Klik baris untuk melihat detail kelompoknya</span></div>';
+    h += '<div class="scroll"><table class="glist"><thead><tr><th>Tingkat</th><th>Tracking ID</th><th>Goods Description</th><th class="num">Qty</th><th class="num">Berat (kg)</th><th class="num">Mayoritas</th><th class="num">Selisih (kg)</th></tr></thead><tbody>' +
+      rows.slice(0, 300).map(function(r){
+        return '<tr data-gi="' + r.gi + '" data-id="' + esc(r.id) + '" tabindex="0"><td><span class="chip ' + r.lvl + '">' + LVT[r.lvl] + '</span></td><td class="mono">' + esc(r.id) + '</td><td><div class="gdesc" title="' + esc(r.desc) + '">' + esc(r.desc) + '</div></td><td class="num">' + r.qty + '</td><td class="num"><b>' + kg(r.weight) + '</b></td><td class="num">' + kg(r.base) + '<span class="psub">' + r.baseC + ' dari ' + r.baseN + ' resi</span></td><td class="num"><span class="' + (r.diff > 0 ? 'diff-up' : 'diff-down') + '">' + sgn(r.diff) + '</span></td></tr>';
+      }).join('') + '</tbody></table></div>';
+    if (rows.length > 300) h += '<p class="count" style="margin-top:6px">Menampilkan 300 pertama dari ' + fmt(rows.length) + '. Gunakan Ekspor untuk daftar lengkap.</p>';
+  }
+  if (seri.length) h += '<h3>Kelompok seri, tanpa berat mayoritas (' + fmt(seri.length) + ' resi)</h3><p class="count">Tidak masuk hitungan di atas karena tidak ada berat yang dianggap normal.</p><div class="idhead"><span></span><button type="button" class="btn small" data-copy="' + esc(seri.map(function(r){ return r.id; }).join('\n')) + '">Salin ID</button></div><div class="ids">' + seri.map(function(r){ return esc(r.id) + ' (' + kg(r.weight) + ' kg)'; }).join(', ') + '</div>';
+  $('#mBody').innerHTML = h;
+  if ($('#modal').hidden){ lastFocus = document.activeElement; $('#modal').hidden = false; }
+  $('#mClose').focus();
+  var sh = document.querySelector('#modal .sheet'); if (sh) sh.scrollTop = 0;
+}
 
 /* ---------- salin ---------- */
 function copyText(t){
@@ -758,8 +904,8 @@ function manualCopy(text){
 function copyAnom(){
   var rows = S.aRows || [];
   if (!rows.length){ toast('Tidak ada hasil untuk disalin.'); return; }
-  var head = ['Tingkat', 'Tracking ID', 'Goods Description', 'Quantity', 'Berat (kg)', 'Mayoritas (kg)', 'Selisih (kg)'].join('\t');
-  var body = rows.map(function(r){ return [LVT[r.lvl], r.id, r.desc.replace(/[\t\r\n]+/g, ' '), r.qty, r.weight, r.base == null ? '' : r.base, r.status === 'seri' ? '' : r.diff].join('\t'); }).join('\n');
+  var head = ['Tingkat', 'Grup', 'Tracking ID', 'Goods Description', 'Quantity', 'Berat (kg)', 'Mayoritas (kg)', 'Selisih (kg)'].join('\t');
+  var body = rows.map(function(r){ return [LVT[r.lvl], r.grp, r.id, r.desc.replace(/[\t\r\n]+/g, ' '), r.qty, r.weight, r.base == null ? '' : r.base, r.status === 'seri' ? '' : r.diff].join('\t'); }).join('\n');
   var text = head + '\n' + body;
   copyText(text).then(function(ok){ if (ok) toast(fmt(rows.length) + ' baris disalin. Tempel ke Excel atau Google Sheets.'); else manualCopy(text); });
 }
@@ -791,38 +937,39 @@ function distText(g){
   return Array.from(g.counts.keys()).sort(function(a, b){ return a - b; }).map(function(w){ return kg(w) + ' kg × ' + g.counts.get(w); }).join('; ');
 }
 function anomAoa(rows){
-  var head = ['Tingkat', 'Tracking ID', 'Goods Description', 'Quantity', 'Berat (kg)', 'Mayoritas (kg)', 'Resi berat mayoritas', 'Jumlah resi di kelompok', 'Selisih (kg)', 'Arah'];
+  var head = ['Tingkat', 'Grup', 'Tracking ID', 'Goods Description', 'Quantity', 'Berat (kg)', 'Mayoritas (kg)', 'Resi berat mayoritas', 'Jumlah resi di kelompok', 'Selisih (kg)', 'Arah'];
   if (S.rate > 0) head.push('Perkiraan kelebihan biaya (Rp)');
   var body = rows.map(function(r){
     var seri = r.status === 'seri';
-    var row = [LVT[r.lvl], r.id, r.desc, r.qty, r.weight, seri ? null : r.base, seri ? null : r.baseC, r.baseN, seri ? null : r.diff, seri ? 'Seri (tanpa mayoritas)' : (r.diff > 0 ? 'Lebih berat' : 'Lebih ringan')];
+    var row = [LVT[r.lvl], r.grp, r.id, r.desc, r.qty, r.weight, seri ? null : r.base, seri ? null : r.baseC, r.baseN, seri ? null : r.diff, seri ? 'Seri (tanpa mayoritas)' : (r.diff > 0 ? 'Lebih berat' : 'Lebih ringan')];
     if (S.rate > 0) row.push(!seri && r.diff > 0 ? r.diff * S.rate : 0);
     return row;
   });
   return [head].concat(body);
 }
 function groupAoa(gs){
-  var head = ['Goods Description', 'Quantity', 'Jumlah resi', 'Berat mayoritas (kg)', 'Resi berat mayoritas', 'Porsi mayoritas (%)', 'Sebaran berat', 'Resi tidak wajar', 'Kelebihan (kg)', 'Status'];
+  var head = ['Goods Description', 'Grup', 'Quantity', 'Jumlah resi', 'Berat mayoritas (kg)', 'Resi berat mayoritas', 'Porsi mayoritas (%)', 'Sebaran berat', 'Resi tidak wajar', 'Kelebihan (kg)', 'Status'];
   var body = gs.map(function(g){
     var seri = g.status === 'seri';
-    return [g.desc, g.qty, g.n, seri ? null : g.mode.w, seri ? null : g.mode.c, seri ? null : pct(g.mode.share), distText(g), seri ? g.nSeri : g.nAnom, g.excess, STT[g.status]];
+    return [g.desc, g.grp, g.qty, g.n, seri ? null : g.mode.w, seri ? null : g.mode.c, seri ? null : pct(g.mode.share), distText(g), seri ? g.nSeri : g.nAnom, g.excess, STT[g.status]];
   });
   return [head].concat(body);
 }
 function doExport(scope, kind){
   if (!S.result) return;
-  var anom = scope === 'anom';
-  var rows = anom ? (S.aRows || []) : getProd();
+  var isGrp = scope.indexOf('grp:') === 0, code = isGrp ? scope.slice(4) : null;
+  var anom = scope === 'anom' || isGrp;
+  var rows = isGrp ? grpRows(code) : (anom ? (S.aRows || []) : getProd());
   if (!rows.length){ toast('Tidak ada data untuk diekspor.'); return; }
   var main = anom ? anomAoa(rows) : groupAoa(rows);
-  var name = (anom ? 'resi-tidak-wajar_' : 'kelompok-berat_') + today();
+  var name = (isGrp ? 'resi-tidak-wajar-' + code.toLowerCase() + '_' : (anom ? 'resi-tidak-wajar_' : 'kelompok-berat_')) + today();
   try{
     if (kind === 'xlsx'){
       if (!window.XLSX){ toast('Pustaka Excel gagal dimuat (perlu internet). Coba ekspor CSV.'); return; }
-      var wb = XLSX.utils.book_new(), gw = [60, 9, 12, 16, 14, 14, 42, 14, 14, 16];
+      var wb = XLSX.utils.book_new(), gw = [60, 9, 9, 12, 16, 14, 14, 42, 14, 14, 16];
       if (anom){
-        XLSX.utils.book_append_sheet(wb, makeSheet(main, [11, 20, 60, 9, 10, 14, 14, 14, 12, 22, 22]), 'Resi tidak wajar');
-        var probs = S.garr.filter(function(g){ return g.nAnom || g.nSeri; }).sort(function(a, b){ return (b.nAnom + b.nSeri) - (a.nAnom + a.nSeri) || b.n - a.n; });
+        XLSX.utils.book_append_sheet(wb, makeSheet(main, [11, 9, 20, 60, 9, 10, 14, 14, 14, 12, 22, 22]), 'Resi tidak wajar');
+        var probs = S.garr.filter(function(g){ return (g.nAnom || g.nSeri) && (!isGrp || g.grp === code); }).sort(function(a, b){ return (b.nAnom + b.nSeri) - (a.nAnom + a.nSeri) || b.n - a.n; });
         XLSX.utils.book_append_sheet(wb, makeSheet(groupAoa(probs), gw), 'Kelompok bermasalah');
       } else XLSX.utils.book_append_sheet(wb, makeSheet(main, gw), 'Kelompok');
       var buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
@@ -898,8 +1045,12 @@ function init(){
     var fs = e.dataTransfer.files; if (!fs || !fs.length) return;
     loadFile(fs[0], fs.length > 1);
   });
-  var re = debounce(function(){ readRate(); if (S.rows.length) renderKPI(); }, 250);
-  $('#oRate').addEventListener('input', re);
+  var re = debounce(function(){ var ch = readRate(); if (!S.rows.length) return; if (ch) recompute(); else renderKPI(); }, 250);
+  ['#oRate', '#oCodes'].forEach(function(s){ $(s).addEventListener('input', re); });
+  $('#oWord').addEventListener('change', re);
+  $('#kpis').addEventListener('click', function(e){ var t = e.target.closest('[data-grp]'); if (t) openGroupList(t.getAttribute('data-grp')); });
+  $('#aGrp').addEventListener('change', function(){ S.a.grp = this.value; S.a.shown = STEP; renderAnom(); });
+  $('#pGrp').addEventListener('change', function(){ S.p.grp = this.value; S.p.shown = STEP; renderProd(); });
 
   $('#aQ').addEventListener('input', debounce(function(){ S.a.q = $('#aQ').value; S.a.shown = STEP; renderAnom(); }, 200));
   $('#aLvl').addEventListener('change', function(){ S.a.lvl = this.value; S.a.shown = STEP; renderAnom(); });
@@ -935,8 +1086,16 @@ function init(){
   $('#mClose').addEventListener('click', closeModal);
   $('#modal').addEventListener('click', function(e){
     if (e.target === this) { closeModal(); return; }
+    var bk = e.target.closest('button[data-back]'); if (bk){ openGroupList(bk.getAttribute('data-back')); return; }
+    var ek = e.target.closest('button[data-kind]'); if (ek){ var mn = ek.closest('.menu'); if (mn) mn.open = false; doExport(ek.dataset.scope, ek.dataset.kind); return; }
     var b = e.target.closest('button[data-copy]');
-    if (b){ var t = b.getAttribute('data-copy'); copyText(t).then(function(ok){ if (ok) toast('Tracking ID disalin.'); else manualCopy(t); }); }
+    if (b){ var t = b.getAttribute('data-copy'); copyText(t).then(function(ok){ if (ok) toast('Tracking ID disalin.'); else manualCopy(t); }); return; }
+    var tr = e.target.closest('table.glist tbody tr[data-gi]'); if (tr) openDetail(+tr.dataset.gi, tr.dataset.id, S.listCode);
+  });
+  $('#modal').addEventListener('keydown', function(e){
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    var tr = e.target.closest && e.target.closest('table.glist tbody tr[data-gi]'); if (!tr) return;
+    e.preventDefault(); openDetail(+tr.dataset.gi, tr.dataset.id, S.listCode);
   });
   document.addEventListener('keydown', function(e){ if (e.key === 'Escape'){ if (!$('#modal').hidden) closeModal(); document.querySelectorAll('.menu[open]').forEach(function(m){ m.open = false; }); } });
 
